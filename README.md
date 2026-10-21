@@ -1,6 +1,6 @@
 # LH_Reminders
 
-Version: 1.0.0. WoW Forever (Interface 16001).
+Version: 1.0.1. WoW Forever (Interface 16001).
 
 LH_Reminders shows clickable icons for selected buffs that are missing on the player. The addon is grouped under LH Tweaks in the AddOn list and has a native page at **Settings > AddOns > LH Tweaks > LH Reminders**. Its icon is copied from LH Tweaks.
 
@@ -37,6 +37,11 @@ If upgrading from MiniReminders, replace its folder with LH_Reminders and restar
 `python LH_Reminders/_run_tests.py` covers the existing Shaman buff, weapon, secure button, combat and command behavior. `python LH_Reminders/_settings_test.py` covers Hunter aspects, add/remove, aura matching, class switching, activation, the native page and its icon/name/`x`/`+` controls. Both run from the AddOns folder. Native visual layout and secure casting still require in-game verification.
 
 ## Changelog
+
+### 1.0.1 - 2026-10-21
+
+- Made the buff input and add button clickable by removing the inherited settings-row tooltip overlay from the custom list panel.
+- Added a regression check for the standalone panel template and Enter-to-add behavior.
 
 ### 1.0.0 - 2026-10-21
 

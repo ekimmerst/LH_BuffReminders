@@ -63,7 +63,6 @@ function methods:SetMaxLetters(value) self.maxLetters=value end
 function methods:ClearFocus() self.focus=false end
 function methods:IsVisible() return self.shown end
 function CreateFromMixins(base) return setmetatable({}, {__index=base}) end
-SettingsListElementMixin={OnLoad=function() end,Init=function() end}
 settingsRows={};registry={};callbacks={};Settings={}
 function Settings.RegisterVerticalLayoutSubcategory(parent,title)
  local c={parent=parent,title=title};function c:GetID() return title end
@@ -113,9 +112,15 @@ panel.edit:SetText('Aspect of the Cheetah');panel.add.scripts.OnClick()
 assert(#LH_Reminders:GetMonitored()==2 and panel.rows[2].icon.texture=='CheetahIcon')
 panel.rows[1].remove.scripts.OnClick(panel.rows[1].remove)
 assert(#LH_Reminders:GetMonitored()==1 and panel.rows[1].name.text=='Aspect of the Cheetah')
+panel.edit:SetText('Aspect of the Hawk');panel.edit.scripts.OnEnterPressed()
+assert(#LH_Reminders:GetMonitored()==2 and panel.rows[2].name.text=='Aspect of the Hawk')
 assert(resetButton==nil and LH_Reminders.ResetClass==nil)
 ''')
 for ext in ('png', 'tga'):
     assert (root / f'LH_Reminders/Media/Icon.{ext}').read_bytes() == (root / f'LH_Tweaks/Icon.{ext}').read_bytes()
-assert 'LHRemindersBuffListTemplate' in (root / 'LH_Reminders/BuffList.xml').read_text()
+from xml.etree import ElementTree
+
+buff_template = ElementTree.parse(root / 'LH_Reminders/BuffList.xml').getroot()[0]
+assert buff_template.attrib['name'] == 'LHRemindersBuffListTemplate'
+assert 'inherits' not in buff_template.attrib, 'A settings-row tooltip frame blocks the buff input'
 print('PASS: class-wide buffs, Hunter aspects, aura matching, activation, native page, icon/name/x/+ controls and shared icon')

@@ -19,13 +19,9 @@ local function Proxy(category, key, label, default, get, set)
     return Settings.RegisterProxySetting(category, variable, "boolean", label, default, get, set)
 end
 
--- Settings_Shared can finish loading after this companion's Lua files.
-LHRemindersBuffListMixin = setmetatable({}, {
-    __index = function(_, key) return SettingsListElementMixin and SettingsListElementMixin[key] end,
-})
+LHRemindersBuffListMixin = {}
 
 function LHRemindersBuffListMixin:OnLoad()
-    SettingsListElementMixin.OnLoad(self)
     Addon.listPanels = Addon.listPanels or {}
     Addon.listPanels[#Addon.listPanels + 1] = self
     local note = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -69,15 +65,12 @@ function LHRemindersBuffListMixin:OnLoad()
 end
 
 function LHRemindersBuffListMixin:Init(initializer)
-    SettingsListElementMixin.Init(self, initializer)
     self:RefreshList()
 end
 
 function LHRemindersBuffListMixin:Release()
-    if SettingsListElementMixin.Release then SettingsListElementMixin.Release(self) end
+    if self.edit then self.edit:ClearFocus() end
 end
-
-function LHRemindersBuffListMixin:EvaluateState() end
 
 function LHRemindersBuffListMixin:OnShow()
     self:RefreshList()
