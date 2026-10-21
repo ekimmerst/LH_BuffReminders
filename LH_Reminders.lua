@@ -10,6 +10,9 @@ local Refresh
 local function InCombat()
     return InCombatLockdown and InCombatLockdown()
 end
+-- Tracks the combat state from events too; secure frames are only locked by InCombat().
+local fighting = false
+local function Fighting() return fighting or InCombat() end
 local anchor = CreateFrame("Frame", "LH_RemindersFrame", UIParent)
 anchor:SetSize(SIZE, SIZE)
 anchor:SetMovable(true)
@@ -211,12 +214,13 @@ local function BuildGroups()
     for _, entry in ipairs(config.monitored) do
         if type(entry) == "table" then
             if entry.kind and defaults[entry.kind] then
+                defaults[entry.kind].entry = entry
                 groups[#groups + 1] = defaults[entry.kind]
             elseif type(entry.id) == "number" then
                 local id, name, icon = ResolveKnownSpell(entry.id)
                 if id then
                     groups[#groups + 1] = {
-                        kind = "buff", id = id, name = name, icon = icon,
+                        kind = "buff", id = id, name = name, icon = icon, entry = entry,
                         ids = {[entry.id] = true, [id] = true}, names = {[BuffName(name)] = true},
                     }
                 end
@@ -240,6 +244,20 @@ function Addon:GetEntry(index)
         return entry.kind == "weapon" and "Weapon enchant" or "Shield", nil
     end
     return SpellInfo(entry.id)
+end
+
+-- mode is "ooc" (watch outside combat) or "combat"; both default to on.
+function Addon:GetWatch(index, mode)
+    local entry = config and config.monitored[index]
+    return entry ~= nil and entry[mode] ~= false
+end
+
+function Addon:SetWatch(index, mode, value)
+    local entry = config and config.monitored[index]
+    if not entry or (mode ~= "ooc" and mode ~= "combat") then return end
+    entry[mode] = value and true or false
+    Refresh()
+    if self.RefreshSettings then self:RefreshSettings() end
 end
 
 function Addon:AddBuff(text)
@@ -283,41 +301,114 @@ function Addon:RemoveBuff(index)
     Refresh()
 end
 
+local lastAuraInfo = "none"
+local lastPayloadDetail = ""
+-- Short ring buffer of aura/cast events for the diagnostic report.
+local eventLog = {}
+local function Log(text)
+    eventLog[#eventLog + 1] = string.format("%.1f %s", GetTime and GetTime() or 0, text)
+    if #eventLog > 30 then table.remove(eventLog, 1) end
+end
+local function Describe(value)
+    if value == nil then return "nil" end
+    if issecretvalue and issecretvalue(value) then return "SECRET(" .. type(value) .. ")" end
+    if type(value) == "table" then return "table" end
+    return tostring(value)
+end
+local function Public(value) return not (issecretvalue and issecretvalue(value)) end
+
+-- true/false, or nil when combat restrictions hide the aura data.
+local function AuraMatches(group, aura)
+    if type(aura) ~= "table" then return false end
+    local id = aura.spellId or aura.spellID
+    if id ~= nil and not Public(id) then return nil end
+    if id and group.ids[id] then return true end
+    local auraName = aura.name
+    if auraName ~= nil and not Public(auraName) then return nil end
+    if auraName and group.names[BuffName(auraName)] then return true end
+    local name = id and SpellInfo(id)
+    return name and group.names[BuffName(name)] or false
+end
+
+-- Remember the matched aura so its removal or expiry can be noticed in combat,
+-- when the aura list itself cannot be trusted.
+local function RememberAura(group, aura)
+    local instance = aura.auraInstanceID
+    group.auraID = type(instance) == "number" and Public(instance) and instance or nil
+    local expires = aura.expirationTime
+    group.expires = type(expires) == "number" and Public(expires) and expires > 0 and expires or nil
+end
+
+local function ForgetAura(group)
+    group.auraID, group.expires, group.carried, group.castAt, group.auraSeen = nil, nil, nil, nil, nil
+end
+
+local function RemovedAura(group)
+    ForgetAura(group)
+    group.removed = true
+end
+
+-- Returns true/false, or nil when combat restrictions hide the aura data.
 local function HasBuff(group)
+    local unreadable = false
     local function Matches(aura)
-        if not aura then return false end
-        local id = aura.spellId or aura.spellID
-        if id and group.ids[id] then return true end
-        if aura.name and group.names[BuffName(aura.name)] then return true end
-        local name = id and SpellInfo(id)
-        return name and group.names[BuffName(name)] or false
+        local result = AuraMatches(group, aura)
+        if result == nil then unreadable = true; return false end
+        if result then RememberAura(group, aura) end
+        return result
     end
     -- Forever can expose weapon buffs as player auras instead of temporary
     -- item enchants. Prefer its batch API, but retain indexed/legacy fallbacks.
     if C_UnitAuras and C_UnitAuras.GetUnitAuras then
         local ok, auras = pcall(C_UnitAuras.GetUnitAuras, "player", "HELPFUL")
-        if ok and type(auras) == "table" then
-            for _, aura in ipairs(auras) do
-                if Matches(aura) then return true end
-            end
+        if not ok or not Public(auras) or
+            (issecrettable and type(auras) == "table" and issecrettable(auras)) then
+            unreadable = true
+        elseif type(auras) == "table" then
+            local scanned, found, nonempty = pcall(function()
+                for _, aura in ipairs(auras) do
+                    if Matches(aura) then return true end
+                end
+                return false, #auras > 0
+            end)
+            if not scanned then unreadable = true
+            elseif found then return true
+            elseif nonempty and not unreadable then return false end
+        else
+            unreadable = true
         end
     end
     for i = 1, 255 do
         local name
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
             local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
-            if ok and aura then
+            if ok and not Public(aura) then
+                unreadable = true
+            elseif ok and aura and not (issecrettable and type(aura) == "table" and issecrettable(aura)) then
                 if Matches(aura) then return true end
                 name = aura.name
+            elseif not ok then
+                unreadable = true
+            elseif aura then
+                unreadable = true
             end
         end
+        if not Public(name) then unreadable = true; name = nil end
         if not name and (UnitBuff or UnitAura) then
-            local ok, legacyName = pcall(UnitBuff or UnitAura, "player", i, "HELPFUL")
-            if ok then name = legacyName end
+            local ok, legacyName, _, _, _, _, expiration = pcall(UnitBuff or UnitAura, "player", i, "HELPFUL")
+            if ok and Public(legacyName) then
+                name = legacyName
+                if name and group.names[BuffName(name)] and Public(expiration) and
+                    type(expiration) == "number" and expiration > 0 then
+                    group.expires = expiration
+                end
+            else unreadable = true end
         end
         if not name then break end
-        if group.names[BuffName(name)] then return true end
+        if not Public(name) then unreadable = true
+        elseif group.names[BuffName(name)] then return true end
     end
+    if unreadable then return nil end
     return false
 end
 
@@ -392,6 +483,7 @@ local function GetButton(index)
     end)
     button:SetScript("OnDragStop", SavePosition)
     button:SetScript("OnEnter", function(self)
+        if self:GetAlpha() == 0 then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         if self.example then
             GameTooltip:SetText("LH_Reminders: Position")
@@ -407,38 +499,199 @@ local function GetButton(index)
     return button
 end
 
+local function Watched(group, inCombat)
+    local entry = group.entry
+    if not entry then return true end
+    if inCombat then return entry.combat ~= false end
+    return entry.ooc ~= false
+end
+
+-- Combat can make the aura list incomplete. A successful cast of a group's own spell, or
+-- a buff seen before combat (group.carried), therefore stays authoritative for the fight
+-- until an aura read has confirmed the buff once (group.auraSeen); only then does a
+-- missing aura mean the buff was lost. A fresh cast also counts for a short grace period.
+local CAST_GRACE = 1.5
+
+-- Aura instance IDs of auras whose fields were unreadable when they were added; a cast
+-- of a watched buff claims the matching one (the aura event and the cast event can
+-- arrive in either order).
+local pendingAdds = {}
+local ATTRIBUTION_WINDOW = 1.0
+
+local function ClaimAura(group, instance)
+    Log("CLAIM " .. tostring(group.name) .. " <- aura " .. tostring(instance))
+    group.auraID, group.expires, group.carried = instance, nil, true
+    group.removed = nil
+end
+
+-- Use the public UNIT_AURA details when available; restricted auras may hide them.
+local function TrackAuras(info)
+    if type(info) ~= "table" or not Public(info) then return end
+    lastAuraInfo = string.format("added=%d updated=%d removed=%d", #(info.addedAuras or {}),
+        #(info.updatedAuraInstanceIDs or {}), #(info.removedAuraInstanceIDs or {}))
+    local detail = {}
+    for _, aura in ipairs(info.addedAuras or {}) do
+        detail[#detail + 1] = type(aura) == "table" and ("add id=" .. Describe(aura.auraInstanceID)
+            .. " spell=" .. Describe(aura.spellId) .. " name=" .. Describe(aura.name)) or "add ?"
+    end
+    for _, id in ipairs(info.removedAuraInstanceIDs or {}) do detail[#detail + 1] = "removed id=" .. Describe(id) end
+    for _, id in ipairs(info.updatedAuraInstanceIDs or {}) do detail[#detail + 1] = "updated id=" .. Describe(id) end
+    lastPayloadDetail = table.concat(detail, "; ")
+    Log("AURA " .. lastAuraInfo .. " [" .. lastPayloadDetail .. "]")
+    for _, instance in ipairs(info.removedAuraInstanceIDs or {}) do
+        for _, group in ipairs(groups) do
+            if group.auraID and group.auraID == instance then
+                Log("FORGET " .. tostring(group.name) .. " (aura " .. tostring(instance) .. " removed)")
+                RemovedAura(group)
+            end
+        end
+    end
+    for _, instance in ipairs(info.updatedAuraInstanceIDs or {}) do
+        for _, group in ipairs(groups) do
+            if group.auraID and group.auraID == instance then
+                local fetch = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+                local ok, aura = false, nil
+                if fetch then ok, aura = pcall(fetch, "player", instance) end
+                if ok and type(aura) == "table" then RememberAura(group, aura) else group.expires = nil end
+            end
+        end
+    end
+    for _, aura in ipairs(info.addedAuras or {}) do
+        local instance = type(aura) == "table" and aura.auraInstanceID
+        local claimed = false
+        for _, group in ipairs(groups) do
+            local match = AuraMatches(group, aura)
+            if match == true then RememberAura(group, aura); group.carried = true; group.removed = nil; claimed = true
+            elseif match == nil and type(instance) == "number" and Public(instance) then
+                if group.castAt and GetTime() - group.castAt < ATTRIBUTION_WINDOW then
+                    ClaimAura(group, instance); claimed = true
+                end
+            end
+        end
+        if not claimed and type(instance) == "number" and Public(instance) then
+            local now = GetTime()
+            pendingAdds[#pendingAdds + 1] = {id = instance, at = now}
+            while #pendingAdds > 10 do table.remove(pendingAdds, 1) end
+        end
+    end
+end
+
+-- Presence probes may also hide an aura in combat. Returns true/false, or nil when unknown.
+-- A missing spell-ID result only proves absence once the same probe has found the buff
+-- during combat (per buff name), because combat restrictions may hide the aura instead.
+local probeProven = {}
+local function AuraPresent(group)
+    local instance, spell
+    local byInstance = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+    if group.auraID and byInstance then
+        local ok, data = pcall(byInstance, "player", group.auraID)
+        if ok then instance = data ~= nil end
+    end
+    if instance then return true end
+    local bySpell = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID
+    if bySpell then
+        for id in pairs(group.ids) do
+            local ok, data = pcall(bySpell, id)
+            if ok then
+                spell = false
+                if data ~= nil then
+                    if type(data) == "table" then pcall(RememberAura, group, data) end
+                    if InCombat() then probeProven[BuffName(group.name)] = true end
+                    return true
+                end
+            end
+        end
+    end
+    -- A vanished known instance is conclusive; a missing spell ID alone is not,
+    -- because the aura may use a different ID than the cast spell.
+    if instance == false then return false end
+    if spell == false and probeProven[BuffName(group.name)] then return false end
+    return nil
+end
+
+local function IsActive(group)
+    if group.kind == "weapon" then
+        local main, _, _, _, off = GetWeaponEnchantInfo()
+        local mainLink = GetInventoryItemLink("player", 16)
+        local offLink = GetInventoryItemLink("player", 17)
+        local active = main or off or HasBuff(group) or not (mainLink or offLink)
+        if not active then
+            active = (mainLink and WeaponTooltipHasBuff(group, 16))
+                or (offLink and WeaponTooltipHasBuff(group, 17))
+        end
+        return active
+    end
+    return HasBuff(group)
+end
+
+-- Secure buttons cannot be shown, hidden or moved during combat, but their
+-- alpha can change. Out of combat every watched buff keeps a button (invisible
+-- while its buff is present), so a buff lost mid-fight can reappear at once.
+local function CombatRefresh()
+    local dead = UnitIsDeadOrGhost("player")
+    for _, button in ipairs(buttons) do
+        local group = button.group
+        local show = false
+        if group and config.enabled then
+            if group.example then show = true
+            elseif not unlocked and not dead and Watched(group, true)
+                and not config.exceptions[BuffName(group.name)] then
+                if group.expires and GetTime() > group.expires + 0.5 then RemovedAura(group) end
+                if group.removed then
+                    show = true
+                else
+                    local ok, active = pcall(IsActive, group)
+                    if not ok then active = nil end
+                    local recent = group.castAt and GetTime() - group.castAt < CAST_GRACE
+                    local okPresent, present = pcall(AuraPresent, group)
+                    if not okPresent then present = nil end
+                    if present == false then active = recent and true or false
+                    elseif active then group.auraSeen = true
+                    elseif present == true then active = true
+                    elseif active == false then active = recent and true or false
+                    elseif group.castAt or group.carried then
+                        active = true
+                    end
+                    show = not active
+                end
+            end
+        end
+        button:SetAlpha(show and 1 or 0)
+    end
+end
+
 Refresh = function()
-    -- Secure actions, visibility and layout must only be changed out of combat.
-    if not initialized or InCombat() then return end
-    local missing = {}
+    if not initialized then return end
+    if InCombat() then return CombatRefresh() end
+    local missing, standby = {}, {}
     if not config.enabled then
         -- No preview or secure action remains visible while disabled.
     elseif unlocked then
         missing[1] = { id = 8017, icon = select(2, SpellInfo(8017)), example = true }
     elseif not UnitIsDeadOrGhost("player") then
+        local fight = Fighting()
         for _, group in ipairs(groups) do
-            local active
-            if group.kind == "weapon" then
-                local main, _, _, _, off = GetWeaponEnchantInfo()
-                local mainLink = GetInventoryItemLink("player", 16)
-                local offLink = GetInventoryItemLink("player", 17)
-                active = main or off or HasBuff(group) or not (mainLink or offLink)
-                if not active then
-                    active = (mainLink and WeaponTooltipHasBuff(group, 16))
-                        or (offLink and WeaponTooltipHasBuff(group, 17))
+            ForgetAura(group)
+            group.removed = nil
+            if not config.exceptions[BuffName(group.name)] then
+                local active = IsActive(group)
+                -- Remembered for combat, when the aura list can omit buffs that are present.
+                group.carried = active and true or nil
+                if Watched(group, fight) and not active then
+                    missing[#missing + 1] = group
+                elseif Watched(group, true) then
+                    standby[#standby + 1] = group
                 end
-            else
-                active = HasBuff(group)
-            end
-            if not active and not config.exceptions[BuffName(group.name)] then
-                missing[#missing + 1] = group
             end
         end
     end
+    local slots = {}
+    for _, group in ipairs(missing) do slots[#slots + 1] = group end
+    for _, group in ipairs(standby) do slots[#slots + 1] = group end
     -- Hiding a dragged button interrupts WoW's drag capture. Keep visible
     -- buttons alive and only change their anchors when the layout changes.
-    for i = #missing + 1, #buttons do buttons[i]:Hide() end
-    for i, group in ipairs(missing) do
+    for i = #slots + 1, #buttons do buttons[i]:Hide(); buttons[i].group = false end
+    for i, group in ipairs(slots) do
         local button = GetButton(i)
         local action = not group.example and group.id or nil
         if button.action ~= action then
@@ -447,6 +700,7 @@ Refresh = function()
             button:SetAttribute("spell", action and (group.name or group.id) or nil)
             button.action = action
         end
+        button.group = group
         button.spellID, button.example = group.id, group.example
         button.icon:SetTexture(group.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         local offset = (i - (#missing + 1) / 2) * (SIZE + GAP)
@@ -455,8 +709,50 @@ Refresh = function()
             button:SetPoint("CENTER", anchor, "CENTER", offset, 0)
             button.offset = offset
         end
+        button:SetAlpha(i <= #missing and 1 or 0)
         button:Show()
     end
+end
+
+-- Diagnostic reports open in a selectable text box (Ctrl+A, Ctrl+C) instead of the chat.
+local reportLines, reportFrame = {}, nil
+local function Out(text) reportLines[#reportLines + 1] = text end
+local function ShowReport()
+    if not reportFrame then
+        reportFrame = CreateFrame("Frame", "LH_RemindersReport", UIParent, "BackdropTemplate")
+        reportFrame:SetSize(620, 360)
+        reportFrame:SetPoint("CENTER")
+        reportFrame:SetFrameStrata("DIALOG")
+        reportFrame:SetMovable(true)
+        reportFrame:EnableMouse(true)
+        reportFrame:RegisterForDrag("LeftButton")
+        reportFrame:SetScript("OnDragStart", reportFrame.StartMoving)
+        reportFrame:SetScript("OnDragStop", reportFrame.StopMovingOrSizing)
+        reportFrame:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 8, insets = {left = 2, right = 2, top = 2, bottom = 2}})
+        reportFrame:SetBackdropColor(0, 0, 0, 0.95)
+        local hint = reportFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        hint:SetPoint("TOPLEFT", 12, -10)
+        hint:SetText("LH_Reminders report - Ctrl+A, Ctrl+C to copy, Esc to close")
+        local scroll = CreateFrame("ScrollFrame", nil, reportFrame, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT", 12, -30)
+        scroll:SetPoint("BOTTOMRIGHT", -32, 12)
+        local edit = CreateFrame("EditBox", nil, scroll)
+        edit:SetMultiLine(true)
+        edit:SetFontObject(ChatFontNormal or GameFontHighlight)
+        edit:SetWidth(560)
+        edit:SetAutoFocus(false)
+        edit:SetScript("OnEscapePressed", function() reportFrame:Hide() end)
+        scroll:SetScrollChild(edit)
+        reportFrame.edit = edit
+        local close = CreateFrame("Button", nil, reportFrame, "UIPanelCloseButton")
+        close:SetPoint("TOPRIGHT", -2, -2)
+    end
+    reportFrame.edit:SetText(table.concat(reportLines, "\n"))
+    reportLines = {}
+    reportFrame:Show()
+    reportFrame.edit:HighlightText()
+    reportFrame.edit:SetFocus()
 end
 
 SLASH_LH_REMINDERS1 = "/lh_reminders"
@@ -485,6 +781,84 @@ SlashCmdList.LH_REMINDERS = function(message)
         Refresh()
         return
     end
+    if command == "probe" then
+        local function Try(label, fn, ...)
+            local ok, a, b, c = pcall(fn, ...)
+            Out("  " .. label .. ": " .. (ok and (Describe(a) .. " " .. Describe(b) .. " " .. Describe(c)) or ("ERROR " .. tostring(a))))
+            return ok, a
+        end
+        for _, entry in ipairs(eventLog) do Out("  log " .. entry) end
+        for _, group in ipairs(groups) do
+            Out("  group " .. tostring(group.name) .. ": auraID=" .. tostring(group.auraID)
+                .. " carried=" .. tostring(group.carried) .. " castAt=" .. tostring(group.castAt))
+        end
+        Out("LH_Reminders probe: lockdown=" .. tostring(InCombat()) .. " lastPayload=[" .. lastPayloadDetail .. "]")
+        if UnitBuff then Try("UnitBuff(1)", UnitBuff, "player", 1) end
+        if UnitAura then Try("UnitAura(1)", UnitAura, "player", 1, "HELPFUL") end
+        local A = C_UnitAuras
+        if A and A.GetAuraDataByIndex then
+            local ok, data = Try("GetAuraDataByIndex(1)", A.GetAuraDataByIndex, "player", 1, "HELPFUL")
+            if ok and type(data) == "table" then
+                Out("    fields: name=" .. Describe(data.name) .. " spellId=" .. Describe(data.spellId)
+                    .. " id=" .. Describe(data.auraInstanceID) .. " expires=" .. Describe(data.expirationTime))
+            end
+        end
+        if A and A.GetUnitAuras then Try("GetUnitAuras", A.GetUnitAuras, "player", "HELPFUL") end
+        if A and A.GetUnitAuraInstanceIDs then
+            local ok, ids = Try("GetUnitAuraInstanceIDs", A.GetUnitAuraInstanceIDs, "player", "HELPFUL")
+            if ok and type(ids) == "table" then
+                local parts = {}
+                for _, id in ipairs(ids) do parts[#parts + 1] = Describe(id) end
+                Out("    ids: " .. table.concat(parts, ","))
+            end
+        end
+        for _, group in ipairs(groups) do
+            if AuraUtil and AuraUtil.FindAuraByName then Try(group.name .. " FindAuraByName", AuraUtil.FindAuraByName, group.name, "player", "HELPFUL") end
+            if A and A.GetAuraDataBySpellName then Try(group.name .. " GetAuraDataBySpellName", A.GetAuraDataBySpellName, "player", group.name, "HELPFUL") end
+            if A and A.GetPlayerAuraBySpellID and group.id then Try(group.name .. " GetPlayerAuraBySpellID", A.GetPlayerAuraBySpellID, group.id) end
+        end
+        ShowReport()
+        return
+    end
+    if command == "debug" then
+        Out("LH_Reminders: lockdown=" .. tostring(InCombat()) .. " fighting=" .. tostring(fighting)
+            .. " enabled=" .. tostring(config and config.enabled))
+        Out("  last UNIT_AURA payload: " .. lastAuraInfo .. " [" .. lastPayloadDetail .. "]"
+            .. " | GetPlayerAuraBySpellID=" .. tostring(C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID ~= nil)
+            .. " GetAuraDataByAuraInstanceID=" .. tostring(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID ~= nil)
+            .. " secrets=" .. tostring(issecretvalue ~= nil))
+        for _, group in ipairs(groups) do
+            local okP, present = pcall(AuraPresent, group)
+            Out("  " .. tostring(group.name) .. " spell probe proven in combat=" .. tostring(probeProven[BuffName(group.name)] == true))
+            Out("  " .. tostring(group.name) .. " presence probe=" .. (okP and tostring(present) or ("error: " .. tostring(present))))
+            if C_UnitAuras and group.auraID and C_UnitAuras.GetAuraDataByAuraInstanceID then
+                local okI, data = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", group.auraID)
+                Out("    byInstance(" .. group.auraID .. "): ok=" .. tostring(okI) .. " result=" .. (okI and type(data) or tostring(data)))
+            end
+            if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+                for id in pairs(group.ids) do
+                    local okS, data = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+                    Out("    bySpell(" .. tostring(id) .. "): ok=" .. tostring(okS) .. " result=" .. (okS and type(data) or tostring(data)))
+                end
+            end
+            if C_UnitAuras and C_UnitAuras.GetUnitAuras then
+                local okL, auras = pcall(C_UnitAuras.GetUnitAuras, "player", "HELPFUL")
+                local count = okL and type(auras) == "table" and #auras or -1
+                Out("    aura list: ok=" .. tostring(okL) .. " entries=" .. count)
+            end
+            for _, button in ipairs(buttons) do
+                if button.group == group then Out("    button alpha=" .. tostring(button:GetAlpha()) .. " shown=" .. tostring(button:IsShown() and true or false)) end
+            end
+            local ok, active = pcall(IsActive, group)
+            Out(string.format("  %s: active=%s%s auraID=%s expiresIn=%s castAge=%s watched ooc=%s combat=%s",
+                tostring(group.name), tostring(active), ok and "" or " (error)", tostring(group.auraID),
+                group.expires and string.format("%.0f", group.expires - GetTime()) or "-",
+                group.castAt and string.format("%.1f", GetTime() - group.castAt) or "-",
+                tostring(Watched(group, false)), tostring(Watched(group, true))))
+        end
+        ShowReport()
+        return
+    end
     if argument ~= "" then command = "" end
     if command == "" and input == "" and Addon.category and Settings and Settings.OpenToCategory then
         Settings.OpenToCategory(Addon.category:GetID())
@@ -502,7 +876,7 @@ SlashCmdList.LH_REMINDERS = function(message)
         unlocked = false
         if config then config.locked = true end
     else
-        print('LH_Reminders: /lh_reminders unlock | lock | except "Spell name" | allow "Spell name"')
+        print('LH_Reminders: /lh_reminders unlock | lock | debug | except "Spell name" | allow "Spell name"')
         return
     end
     Refresh()
@@ -515,21 +889,53 @@ function Addon:SetEnabled(enabled)
     Refresh()
 end
 
-anchor:SetScript("OnEvent", function(_, event, unit)
+anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
     if event == "ADDON_LOADED" then
         if unit ~= addonName then return end
         LH_RemindersDB = type(LH_RemindersDB) == "table" and LH_RemindersDB or {}
         SelectConfig()
         initialized = true
+        fighting = UnitAffectingCombat and UnitAffectingCombat("player") or false
         BuildGroups()
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        fighting = true
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        fighting = false
     elseif event == "UNIT_AURA" and unit ~= "player" then
         return
+    elseif event == "UNIT_AURA" then
+        lastAuraInfo = type(extra) == "table" and "payload" or tostring(extra)
+        lastPayloadDetail = ""
+        if type(extra) ~= "table" or not Public(extra) then Log("AURA payload " .. Describe(extra)) end
+        local ok = pcall(TrackAuras, extra)
+        if not ok then
+            lastAuraInfo = "unreadable payload"
+            Log("AURA payload unreadable")
+        end
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        if unit ~= "player" then return end
+        if not Public(spellID) then Log("CAST with SECRET spell id"); return end
+        for _, group in ipairs(groups) do
+            if group.ids[spellID] then
+                local now = GetTime()
+                Log("CAST " .. tostring(group.name) .. " pending=" .. #pendingAdds)
+                group.castAt, group.auraSeen, group.expires, group.removed = now, nil, nil, nil
+                for i = #pendingAdds, 1, -1 do
+                    local pending = pendingAdds[i]
+                    if now - pending.at < ATTRIBUTION_WINDOW then
+                        ClaimAura(group, pending.id)
+                        table.remove(pendingAdds, i)
+                        break
+                    end
+                end
+            end
+        end
     elseif event == "SPELLS_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
         BuildGroups()
     end
     Refresh()
 end)
-for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED", "UNIT_AURA", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ALIVE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_REGEN_ENABLED", "UNIT_INVENTORY_CHANGED" }) do
+for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED", "UNIT_AURA", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ALIVE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_INVENTORY_CHANGED" }) do
     anchor:RegisterEvent(event)
 end
 -- Temporary weapon enchantments can expire without UNIT_AURA firing.

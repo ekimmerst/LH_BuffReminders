@@ -31,7 +31,12 @@ function LHRemindersBuffListMixin:OnLoad()
     note:SetJustifyH("LEFT")
 
     local scroll = CreateFrame("ScrollFrame", nil, self, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 8, -29)
+    scroll:SetPoint("TOPLEFT", 8, -43)
+    for _, column in ipairs({{"Out of combat", 238}, {"In combat", 320}}) do
+        local header = self:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        header:SetPoint("TOP", self, "TOPLEFT", column[2], -27)
+        header:SetText(column[1])
+    end
     scroll:SetSize(420, 188)
     self.scroll = scroll
     self.content = CreateFrame("Frame", nil, scroll)
@@ -89,8 +94,24 @@ function LHRemindersBuffListMixin:RefreshList()
             row.icon:SetPoint("LEFT", 4, 0)
             row.name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
             row.name:SetPoint("LEFT", row.icon, "RIGHT", 9, 0)
-            row.name:SetWidth(295)
+            row.name:SetWidth(160)
             row.name:SetJustifyH("LEFT")
+            for _, mode in ipairs({{"ooc", 218, "Watch this buff outside combat."},
+                {"combat", 300, "Watch this buff during combat."}}) do
+                local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+                check:SetSize(24, 24)
+                check:SetPoint("LEFT", mode[2], 0)
+                check.mode = mode[1]
+                check:SetScript("OnClick", function(box)
+                    Addon:SetWatch(box:GetParent().index, box.mode, box:GetChecked())
+                end)
+                check:SetScript("OnEnter", function(box)
+                    GameTooltip:SetOwner(box, "ANCHOR_RIGHT")
+                    GameTooltip:SetText(mode[3], 1, 1, 1, 1, true)
+                end)
+                check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                row[mode[1]] = check
+            end
             row.remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             row.remove:SetSize(26, 24)
             row.remove:SetPoint("RIGHT", -4, 0)
@@ -100,6 +121,8 @@ function LHRemindersBuffListMixin:RefreshList()
         end
         local name, icon = Addon:GetEntry(index)
         row.index = index
+        row.ooc:SetChecked(Addon:GetWatch(index, "ooc"))
+        row.combat:SetChecked(Addon:GetWatch(index, "combat"))
         row.name:SetText(name or "Unknown buff")
         row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         row:ClearAllPoints()

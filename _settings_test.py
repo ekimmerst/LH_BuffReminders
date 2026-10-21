@@ -124,3 +124,126 @@ buff_template = ElementTree.parse(root / 'LH_Reminders/BuffList.xml').getroot()[
 assert buff_template.attrib['name'] == 'LHRemindersBuffListTemplate'
 assert 'inherits' not in buff_template.attrib, 'A settings-row tooltip frame blocks the buff input'
 print('PASS: class-wide buffs, Hunter aspects, aura matching, activation, native page, icon/name/x/+ controls and shared icon')
+lua.execute('''
+-- Per-buff watching outside and inside combat; combat changes use alpha only.
+TestRemindersSetClass('HUNTER')
+local entry=LH_RemindersClassDB.HUNTER.monitored[1]
+local cheetah=LH_RemindersClassDB.HUNTER.monitored[2]
+LH_Reminders:RemoveBuff(1)
+assert(#LH_Reminders:GetMonitored()==1 and LH_Reminders:GetWatch(1,'ooc') and LH_Reminders:GetWatch(1,'combat'))
+local oldBuff=UnitBuff
+local hawk=true
+UnitBuff=function(_,index) if hawk and index==1 then return 'Aspect of the Hawk' end end
+TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+-- Buff lost in combat: the reminder appears; recast hides it again.
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+hawk=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
+hawk=true;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+hawk=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
+-- Not watched in combat: hidden during combat, shown again afterwards.
+LH_Reminders:SetWatch(1,'combat',false);assert(#TestRemindersVisible()==0)
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED');assert(#TestRemindersVisible()==1)
+-- Not watched outside combat: hidden now, shown when combat starts without any layout change.
+LH_Reminders:SetWatch(1,'combat',true);LH_Reminders:SetWatch(1,'ooc',false)
+assert(#TestRemindersVisible()==0 and not LH_Reminders:GetWatch(1,'ooc'))
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED');assert(#TestRemindersVisible()==1)
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED');assert(#TestRemindersVisible()==0)
+LH_Reminders:SetWatch(1,'ooc',true);assert(#TestRemindersVisible()==1)
+-- Combat restrictions can hide aura data; the player's own cast then hides the reminder.
+local secret={}
+local oldSecret,oldTime=issecretvalue,GetTime
+local now=100;GetTime=function() return now end
+issecretvalue=function(v) return v==secret end
+UnitBuff=function(_,index) if index==1 then return secret end end
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Unreadable auras must not hide the reminder')
+TestRemindersEvent('UNIT_SPELLCAST_SUCCEEDED','player','guid',13165);assert(#TestRemindersVisible()==0)
+now=110;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED');assert(#TestRemindersVisible()==1)
+-- A denied aura scan cannot disprove a successful cast.
+UnitBuff=function() error('restricted aura scan') end
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+now=200;TestRemindersEvent('UNIT_SPELLCAST_SUCCEEDED','player','guid',13165);assert(#TestRemindersVisible()==0)
+now=210;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0,'Unrelated aura event re-showed the icon')
+-- Once the aura has been seen, its disappearance means it was lost.
+UnitBuff=function(_,index) if index==1 then return 'Aspect of the Hawk' end end
+now=211;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+UnitBuff=function() end
+now=212;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
+-- Buff present before combat but unreadable in combat.
+UnitBuff=function(_,index) if index==1 then return 'Aspect of the Hawk' end end
+TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+UnitBuff=function() error('restricted aura scan') end
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+now=300;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0,'Pre-combat buff re-shown in combat')
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
+assert(#TestRemindersVisible()==1)
+-- Removal (expiry or right-click) is noticed in combat through the UNIT_AURA details.
+local oldAuras=C_UnitAuras
+local list={{name='Aspect of the Hawk',auraInstanceID=77,expirationTime=0}}
+C_UnitAuras={GetUnitAuras=function() return list end}
+UnitBuff=function() end
+now=400;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+list={}
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+C_UnitAuras.GetUnitAuras=function() error('restricted aura scan') end
+TestRemindersEvent('UNIT_AURA','player',{removedAuraInstanceIDs={5}});assert(#TestRemindersVisible()==0)
+C_UnitAuras.GetUnitAuras=function() return list end
+TestRemindersEvent('UNIT_AURA','player',{removedAuraInstanceIDs={77}});assert(#TestRemindersVisible()==1,'Removed aura not noticed in combat')
+-- Recast: the aura appears again and is tracked; its known expiry time then hides/shows it.
+now=410;TestRemindersEvent('UNIT_SPELLCAST_SUCCEEDED','player','guid',13165);assert(#TestRemindersVisible()==0)
+TestRemindersEvent('UNIT_AURA','player',{addedAuras={{name='Aspect of the Hawk',auraInstanceID=88,expirationTime=500}}})
+C_UnitAuras.GetUnitAuras=function() error('restricted aura scan') end
+now=450;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+now=500.2;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0,'Expiry grace')
+now=501;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Expired aura not noticed in combat')
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
+-- Presence probes work without a usable aura list or event payload.
+local present=true
+list={{name='Aspect of the Hawk',auraInstanceID=91,expirationTime=0}}
+C_UnitAuras={GetUnitAuras=function() return list end,
+ GetAuraDataByAuraInstanceID=function(_,id) assert(id==91);if present then return {} end end}
+TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+list={}
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+present=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Vanished aura instance not noticed')
+-- Spell-ID probe finds a recast buff and records its instance.
+C_UnitAuras.GetPlayerAuraBySpellID=function(id) if id==13165 then return {auraInstanceID=92} end end
+C_UnitAuras.GetAuraDataByAuraInstanceID=function(_,id) if id==92 then return {} end end
+now=600;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+-- Once the spell probe has found the buff in combat, its absence means the buff is gone.
+C_UnitAuras.GetPlayerAuraBySpellID=function() return nil end
+C_UnitAuras.GetAuraDataByAuraInstanceID=nil
+now=610;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Missing proven spell probe not noticed')
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
+C_UnitAuras=oldAuras
+-- Unreadable aura added right after the cast (either event order) is claimed by the cast.
+local present2=true
+C_UnitAuras={GetUnitAuras=function() error('restricted') end,
+ GetAuraDataByAuraInstanceID=function(_,id) if present2 and id==93 then return {} end end,
+ GetPlayerAuraBySpellID=function() return nil end}
+issecretvalue=function(v) return v==secret end
+TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED')
+now=700;TestRemindersEvent('UNIT_SPELLCAST_SUCCEEDED','player','guid',13165)
+TestRemindersEvent('UNIT_AURA','player',{addedAuras={{name=secret,spellId=secret,auraInstanceID=93}}})
+now=720;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0,'Claimed aura should hide the icon')
+present2=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Claimed aura removal not noticed')
+-- Aura event before the cast event.
+present2=true
+C_UnitAuras.GetAuraDataByAuraInstanceID=function(_,id) if present2 and id==94 then return {} end end
+now=800;TestRemindersEvent('UNIT_AURA','player',{addedAuras={{name=secret,spellId=secret,auraInstanceID=94}}})
+TestRemindersEvent('UNIT_SPELLCAST_SUCCEEDED','player','guid',13165)
+now=820;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
+present2=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1,'Pending aura attribution failed')
+TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
+C_UnitAuras=oldAuras
+issecretvalue,GetTime=oldSecret,oldTime
+UnitBuff=oldBuff
+''')
+print('PASS: per-buff out-of-combat/in-combat watching and in-combat icon removal and reappearance')
+lua.execute('''
+-- Diagnostic commands must not raise errors.
+SlashCmdList.LH_REMINDERS('debug');SlashCmdList.LH_REMINDERS('probe')
+''')

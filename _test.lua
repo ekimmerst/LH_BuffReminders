@@ -4,10 +4,20 @@ local methods = {}
 setmetatable(methods, { __index = function() return function() end end })
 function methods:SetScript(k,v) self.scripts[k]=v end
 function methods:SetSize(w,h) self.width,self.height=w,h end
-function methods:SetPoint(...) self.point={...}; self.pointChanges=(rawget(self,'pointChanges') or 0)+1 end
+function methods:SetPoint(...)
+ assert(not (self.kind=='Button' and InCombatLockdown()), 'Secure button moved in combat')
+ self.point={...}; self.pointChanges=(rawget(self,'pointChanges') or 0)+1
+end
+function methods:SetAlpha(a) self.alpha=a end
+function methods:GetAlpha() return rawget(self,'alpha') or 1 end
 function methods:GetCenter() return 500,300 end
-function methods:Show() self.shown=true end
-function methods:Hide() self.shown=false; self.hideCalls=(rawget(self,'hideCalls') or 0)+1 end
+function methods:Show()
+ assert(not (self.kind=='Button' and InCombatLockdown()), 'Secure button shown in combat')
+ self.shown=true
+end
+function methods:Hide()
+ assert(not (self.kind=='Button' and InCombatLockdown()), 'Secure button hidden in combat')
+ self.shown=false; self.hideCalls=(rawget(self,'hideCalls') or 0)+1 end
 function methods:StartMoving() self.moving=true end
 function methods:StopMovingOrSizing() self.moving=false end
 function methods:SetAttribute(key,value)
@@ -42,7 +52,7 @@ local f=LH_RemindersFrame
 local function event(e,u) f.scripts.OnEvent(f,e,u) end
 local function visible()
  local result={}
- for _,b in ipairs(frames) do if b.kind=='Button' and b.shown then result[#result+1]=b end end
+ for _,b in ipairs(frames) do if b.template=='SecureActionButtonTemplate' and b.shown and b:GetAlpha()~=0 then result[#result+1]=b end end
  return result
 end
 -- The weapon enchant already exists at login but neither aura nor enchant API reports it.
@@ -72,8 +82,9 @@ event('PLAYER_ENTERING_WORLD'); assert(#visible()==1)
 tooltipLines={{leftText='Weapon Damage +2'}}
 event('UNIT_INVENTORY_CHANGED','player'); assert(#visible()==2)
 tooltipLines={{leftText='Rockbiter 2'}}
-combat=true; event('UNIT_AURA','player'); f.scripts.OnUpdate(f,0.5)
-assert(#visible()==2, 'Secure buttons changed in combat')
+-- A buff gained during combat hides its reminder at once (alpha only, no secure changes).
+combat=true; event('PLAYER_REGEN_DISABLED'); event('UNIT_AURA','player'); f.scripts.OnUpdate(f,0.5)
+assert(#visible()==1, 'Buff gained in combat must hide the reminder')
 combat=false; event('PLAYER_REGEN_ENABLED'); assert(#visible()==1)
 tooltipLines={}; f.scripts.OnUpdate(f,0.5); b=visible()
 assert(b[1].width==36 and b[1].height==36)
@@ -144,7 +155,7 @@ for _,cmd in ipairs({'except', 'except ""', 'except "Lightning Shield', 'except 
  assert(#visible()==2 and next(LH_RemindersClassDB.SHAMAN.exceptions)==nil, 'Invalid input changed exceptions')
 end
 combat=true
-SlashCmdList.LH_REMINDERS('except "Lightning Shield"'); assert(#visible()==2)
+SlashCmdList.LH_REMINDERS('except "Lightning Shield"'); assert(#visible()==1, 'Exception must apply in combat')
 combat=false; event('PLAYER_REGEN_ENABLED'); assert(#visible()==1)
 SlashCmdList.LH_REMINDERS('unlock'); assert(#visible()==1 and visible()[1].example)
 SlashCmdList.LH_REMINDERS('except "Rockbiter 2"'); assert(#visible()==1 and visible()[1].example)
@@ -153,6 +164,7 @@ SlashCmdList.LH_REMINDERS('allow "Rockbiter Weapon"'); assert(#visible()==1)
 SlashCmdList.LH_REMINDERS('allow "Lightning Shield"'); assert(#visible()==2)
 function TestRemindersSetClass(token) class=token; event('SPELLS_CHANGED') end
 TestRemindersVisible=visible
-function TestRemindersEvent(name,unit) event(name,unit) end
+function TestRemindersCombat(value) combat=value end
+function TestRemindersEvent(name,unit,...) f.scripts.OnEvent(f,name,unit,...) end
 print('PASS: persistent per-buff exceptions, allow, ranks, quotes, invalid input, combat deferral and unlock preview')
 print('PASS: pre-existing login enchant, modern/legacy weapon tooltips, rank 2 casting attributes, aura ranks, expiry, combat deferral, stable dragging, layout and class filtering')

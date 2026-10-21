@@ -1,6 +1,6 @@
 # LH_Reminders
 
-Version: 1.0.1. WoW Forever (Interface 16001).
+Version: 1.1.0. WoW Forever (Interface 16001).
 
 LH_Reminders shows clickable icons for selected buffs that are missing on the player. The addon is grouped under LH Tweaks in the AddOn list and has a native page at **Settings > AddOns > LH Tweaks > LH Reminders**. Its icon is copied from LH Tweaks.
 
@@ -10,7 +10,7 @@ The settings page has an icon-and-name list for the current class. Use `x` to re
 
 Shamans initially retain the original weapon-enchantment and shield reminders. Any active weapon enchantment on either weapon satisfies the weapon reminder, and Lightning Shield, Water Shield and Earth Shield count as alternatives for the shield reminder. The addon checks player auras and equipped weapon tooltips, including existing buffs after login or reload. The weapon reminder is hidden when no weapon is equipped. Remove either default entry with `x` if you do not want it. Other classes begin with an empty list; Hunter aspects can be added through the same picker.
 
-The page also has activation and unlock/preview controls. The reminder icons are 36 UI pixels, glow gold and are centered around the saved position with an 8-pixel gap. Unlock shows a draggable preview icon. All icon changes are deferred until combat ends because the icons are secure cast buttons. Reminders are hidden while the player is dead.
+The page also has activation and unlock/preview controls. The reminder icons are 36 UI pixels, glow gold and are centered around the saved position with an 8-pixel gap. Unlock shows a draggable preview icon. Each monitored buff has two checkboxes, **Out of combat** and **In combat** (both on by default), that choose when it is watched. The icons are secure cast buttons, which cannot be shown, hidden or moved during combat. Outside combat every watched buff therefore keeps an invisible button (placed to the right of the visible row); during combat the addon only changes the button's transparency. A buff cast in combat hides its icon at once. Its icon reappears on expiry when the expiration time was readable, or on removal when its aura ID was known. WoW Forever can restrict aura data in combat, so a buff cast there may remain untrackable until combat ends. The layout is rearranged after combat. Exceptions also take effect immediately. Reminders are hidden while the player is dead.
 
 ## Class-wide saved settings
 
@@ -37,6 +37,11 @@ If upgrading from MiniReminders, replace its folder with LH_Reminders and restar
 `python LH_Reminders/_run_tests.py` covers the existing Shaman buff, weapon, secure button, combat and command behavior. `python LH_Reminders/_settings_test.py` covers Hunter aspects, add/remove, aura matching, class switching, activation, the native page and its icon/name/`x`/`+` controls. Both run from the AddOns folder. Native visual layout and secure casting still require in-game verification.
 
 ## Changelog
+
+### 1.1.0 - 2026-10-21
+
+- Fixed reminders staying visible after the buff was cast during combat (for example Battle Shout): combat updates now change transparency instead of being skipped.
+- Added per-buff **Out of combat** / **In combat** watch checkboxes to the buff list.
 
 ### 1.0.1 - 2026-10-21
 
