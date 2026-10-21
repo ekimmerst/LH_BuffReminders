@@ -1,9 +1,15 @@
 ## Interface: 16001
 ## Dependencies: LH_Tweaks
-## Title: LH_Reminders
+## Title: LH Reminders
+## Group: LH_Tweaks
+## X-Part-Of: LH_Tweaks
+## IconTexture: Interface\AddOns\LH_Reminders\Media\Icon
 ## Notes: Reminds you of missing class buffs.
 ## Author: LH_Reminders
-## Version: 0.3.1
+## Version: 1.0.0
+## SavedVariables: LH_RemindersClassDB
 ## SavedVariablesPerCharacter: LH_RemindersDB
 
 LH_Reminders.lua
+Settings.lua
+BuffList.xml

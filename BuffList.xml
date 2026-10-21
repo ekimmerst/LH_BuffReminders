@@ -1,0 +1,9 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="LHRemindersBuffListTemplate" inherits="SettingsListElementTemplate" mixin="LHRemindersBuffListMixin" virtual="true">
+        <Size x="460" y="284"/>
+        <Scripts>
+            <OnLoad>self:OnLoad()</OnLoad>
+            <OnShow>self:OnShow()</OnShow>
+        </Scripts>
+    </Frame>
+</Ui>

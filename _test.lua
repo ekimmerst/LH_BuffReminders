@@ -122,7 +122,7 @@ for attempt=1,3 do
  assert(example.pointChanges==points, 'Refresh reanchored the dragged example')
  example.scripts.OnDragStop(); assert(not f.moving)
 end
-assert(LH_RemindersDB.x==0)
+assert(LH_RemindersClassDB.SHAMAN.x==0)
 SlashCmdList.LH_REMINDERS('lock'); assert(#visible()==0)
 enchanted=false; shield=false; dead=true; event('PLAYER_DEAD'); assert(#visible()==0)
 dead=false; weapon=false; event('PLAYER_ALIVE'); assert(#visible()==1)
@@ -133,7 +133,7 @@ class='SHAMAN'; weapon=true; enchanted=false; shield=false; tooltipLines={}
 event('SPELLS_CHANGED'); assert(#visible()==2)
 SlashCmdList.LH_REMINDERS('except "Lightning Shield"')
 assert(#visible()==1 and visible()[1].spellID==8017)
-assert(LH_RemindersDB.exceptions['lightning shield'])
+assert(LH_RemindersClassDB.SHAMAN.exceptions['lightning shield'])
 event('ADDON_LOADED','LH_Reminders'); event('PLAYER_ENTERING_WORLD')
 assert(#visible()==1, 'Exception did not survive initialization')
 SlashCmdList.LH_REMINDERS('  ALLOW "LIGHTNING SHIELD 2"  '); assert(#visible()==2)
@@ -141,7 +141,7 @@ SlashCmdList.LH_REMINDERS('except "Blitzschlagschild"'); assert(#visible()==1)
 SlashCmdList.LH_REMINDERS('allow Lightning Shield'); assert(#visible()==2)
 for _,cmd in ipairs({'except', 'except ""', 'except "Lightning Shield', 'except "Lightning Shield" extra', 'allow "'}) do
  SlashCmdList.LH_REMINDERS(cmd)
- assert(#visible()==2 and next(LH_RemindersDB.exceptions)==nil, 'Invalid input changed exceptions')
+ assert(#visible()==2 and next(LH_RemindersClassDB.SHAMAN.exceptions)==nil, 'Invalid input changed exceptions')
 end
 combat=true
 SlashCmdList.LH_REMINDERS('except "Lightning Shield"'); assert(#visible()==2)
@@ -151,5 +151,8 @@ SlashCmdList.LH_REMINDERS('except "Rockbiter 2"'); assert(#visible()==1 and visi
 SlashCmdList.LH_REMINDERS('lock'); assert(#visible()==0)
 SlashCmdList.LH_REMINDERS('allow "Rockbiter Weapon"'); assert(#visible()==1)
 SlashCmdList.LH_REMINDERS('allow "Lightning Shield"'); assert(#visible()==2)
+function TestRemindersSetClass(token) class=token; event('SPELLS_CHANGED') end
+TestRemindersVisible=visible
+function TestRemindersEvent(name,unit) event(name,unit) end
 print('PASS: persistent per-buff exceptions, allow, ranks, quotes, invalid input, combat deferral and unlock preview')
 print('PASS: pre-existing login enchant, modern/legacy weapon tooltips, rank 2 casting attributes, aura ranks, expiry, combat deferral, stable dragging, layout and class filtering')
