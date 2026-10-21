@@ -37,8 +37,8 @@ function GetWeaponEnchantInfo() return enchanted,nil,nil,nil,false end
 function GetInventoryItemLink() if weapon then return 'weapon' end end
 function UnitIsDeadOrGhost() return dead end
 function UnitBuff(_,i) if shield and i==1 then return 'Lightning Shield' end end
-assert(loadfile('MiniReminders/MiniReminders.lua'))('MiniReminders')
-local f=MiniRemindersFrame
+assert(loadfile('LH_Reminders/LH_Reminders.lua'))('LH_Reminders')
+local f=LH_RemindersFrame
 local function event(e,u) f.scripts.OnEvent(f,e,u) end
 local function visible()
  local result={}
@@ -48,7 +48,7 @@ end
 -- The weapon enchant already exists at login but neither aura nor enchant API reports it.
 local tooltipLines={{leftText='Rockbiter 2'}}
 C_TooltipInfo={GetInventoryItem=function() return {lines=tooltipLines} end}
-event('ADDON_LOADED','MiniReminders')
+event('ADDON_LOADED','LH_Reminders')
 assert(#visible()==1 and visible()[1].spellID==324, 'Existing login weapon buff missed')
 tooltipLines={}; f.scripts.OnUpdate(f,0.5)
 local b=visible(); assert(#b==2)
@@ -63,7 +63,7 @@ IsPlayerSpell=known; event('SPELLS_CHANGED')
 local modernTooltip=C_TooltipInfo
 C_TooltipInfo=nil
 legacyTooltipText='Rockbiter 2'
-MiniRemindersWeaponTooltipTextLeft1={GetText=function() return legacyTooltipText end}
+LH_RemindersWeaponTooltipTextLeft1={GetText=function() return legacyTooltipText end}
 event('PLAYER_ENTERING_WORLD'); assert(#visible()==1, 'Legacy weapon tooltip missed')
 legacyTooltipText=nil; C_TooltipInfo=modernTooltip
 f.scripts.OnUpdate(f,0.5); b=visible(); assert(#b==2)
@@ -106,7 +106,7 @@ UnitBuff=legacyBuff; C_UnitAuras=nil
 event('UNIT_AURA','player'); assert(#visible()==2, 'Expired weapon aura must restore reminder')
 enchanted=true
 shield=true; event('UNIT_AURA','player'); assert(#visible()==0)
-SlashCmdList.MINIREMINDERS('unlock'); b=visible(); assert(#b==1 and b[1].example)
+SlashCmdList.LH_REMINDERS('unlock'); b=visible(); assert(#b==1 and b[1].example)
 assert(b[1].attributes.type==nil and b[1].attributes.spell==nil, 'Example must not cast')
 local example=b[1]
 local hides, points=rawget(example,'hideCalls') or 0, example.pointChanges
@@ -122,34 +122,34 @@ for attempt=1,3 do
  assert(example.pointChanges==points, 'Refresh reanchored the dragged example')
  example.scripts.OnDragStop(); assert(not f.moving)
 end
-assert(MiniRemindersDB.x==0)
-SlashCmdList.MINIREMINDERS('lock'); assert(#visible()==0)
+assert(LH_RemindersDB.x==0)
+SlashCmdList.LH_REMINDERS('lock'); assert(#visible()==0)
 enchanted=false; shield=false; dead=true; event('PLAYER_DEAD'); assert(#visible()==0)
 dead=false; weapon=false; event('PLAYER_ALIVE'); assert(#visible()==1)
 class='MAGE'; event('SPELLS_CHANGED'); assert(#visible()==0)
-SlashCmdList.MINIREMINDERS('unlock'); assert(#visible()==1)
-SlashCmdList.MINIREMINDERS('lock'); assert(#visible()==0)
+SlashCmdList.LH_REMINDERS('unlock'); assert(#visible()==1)
+SlashCmdList.LH_REMINDERS('lock'); assert(#visible()==0)
 class='SHAMAN'; weapon=true; enchanted=false; shield=false; tooltipLines={}
 event('SPELLS_CHANGED'); assert(#visible()==2)
-SlashCmdList.MINIREMINDERS('except "Lightning Shield"')
+SlashCmdList.LH_REMINDERS('except "Lightning Shield"')
 assert(#visible()==1 and visible()[1].spellID==8017)
-assert(MiniRemindersDB.exceptions['lightning shield'])
-event('ADDON_LOADED','MiniReminders'); event('PLAYER_ENTERING_WORLD')
+assert(LH_RemindersDB.exceptions['lightning shield'])
+event('ADDON_LOADED','LH_Reminders'); event('PLAYER_ENTERING_WORLD')
 assert(#visible()==1, 'Exception did not survive initialization')
-SlashCmdList.MINIREMINDERS('  ALLOW "LIGHTNING SHIELD 2"  '); assert(#visible()==2)
-SlashCmdList.MINIREMINDERS('except "Blitzschlagschild"'); assert(#visible()==1)
-SlashCmdList.MINIREMINDERS('allow Lightning Shield'); assert(#visible()==2)
+SlashCmdList.LH_REMINDERS('  ALLOW "LIGHTNING SHIELD 2"  '); assert(#visible()==2)
+SlashCmdList.LH_REMINDERS('except "Blitzschlagschild"'); assert(#visible()==1)
+SlashCmdList.LH_REMINDERS('allow Lightning Shield'); assert(#visible()==2)
 for _,cmd in ipairs({'except', 'except ""', 'except "Lightning Shield', 'except "Lightning Shield" extra', 'allow "'}) do
- SlashCmdList.MINIREMINDERS(cmd)
- assert(#visible()==2 and next(MiniRemindersDB.exceptions)==nil, 'Invalid input changed exceptions')
+ SlashCmdList.LH_REMINDERS(cmd)
+ assert(#visible()==2 and next(LH_RemindersDB.exceptions)==nil, 'Invalid input changed exceptions')
 end
 combat=true
-SlashCmdList.MINIREMINDERS('except "Lightning Shield"'); assert(#visible()==2)
+SlashCmdList.LH_REMINDERS('except "Lightning Shield"'); assert(#visible()==2)
 combat=false; event('PLAYER_REGEN_ENABLED'); assert(#visible()==1)
-SlashCmdList.MINIREMINDERS('unlock'); assert(#visible()==1 and visible()[1].example)
-SlashCmdList.MINIREMINDERS('except "Rockbiter 2"'); assert(#visible()==1 and visible()[1].example)
-SlashCmdList.MINIREMINDERS('lock'); assert(#visible()==0)
-SlashCmdList.MINIREMINDERS('allow "Rockbiter Weapon"'); assert(#visible()==1)
-SlashCmdList.MINIREMINDERS('allow "Lightning Shield"'); assert(#visible()==2)
+SlashCmdList.LH_REMINDERS('unlock'); assert(#visible()==1 and visible()[1].example)
+SlashCmdList.LH_REMINDERS('except "Rockbiter 2"'); assert(#visible()==1 and visible()[1].example)
+SlashCmdList.LH_REMINDERS('lock'); assert(#visible()==0)
+SlashCmdList.LH_REMINDERS('allow "Rockbiter Weapon"'); assert(#visible()==1)
+SlashCmdList.LH_REMINDERS('allow "Lightning Shield"'); assert(#visible()==2)
 print('PASS: persistent per-buff exceptions, allow, ranks, quotes, invalid input, combat deferral and unlock preview')
 print('PASS: pre-existing login enchant, modern/legacy weapon tooltips, rank 2 casting attributes, aura ranks, expiry, combat deferral, stable dragging, layout and class filtering')

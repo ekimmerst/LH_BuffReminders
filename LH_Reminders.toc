@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: LH_Reminders
+## Notes: Reminds you of missing class buffs.
+## Author: LH_Reminders
+## Version: 0.3.1
+## SavedVariablesPerCharacter: LH_RemindersDB
+
+LH_Reminders.lua

@@ -17,7 +17,7 @@ os.chdir(Path(__file__).resolve().parent.parent)
 state = lib.luaL_newstate()
 try:
     lib.luaL_openlibs(state)
-    status = lib.luaL_loadfilex(state, b'MiniReminders/_test.lua', None)
+    status = lib.luaL_loadfilex(state, b'LH_Reminders/_test.lua', None)
     if status == 0:
         status = lib.lua_pcallk(state, 0, -1, 0, 0, None)
     if status:

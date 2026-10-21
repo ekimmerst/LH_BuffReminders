@@ -6,7 +6,7 @@ local weaponTooltip
 local function InCombat()
     return InCombatLockdown and InCombatLockdown()
 end
-local anchor = CreateFrame("Frame", "MiniRemindersFrame", UIParent)
+local anchor = CreateFrame("Frame", "LH_RemindersFrame", UIParent)
 anchor:SetSize(SIZE, SIZE)
 anchor:SetMovable(true)
 anchor:SetClampedToScreen(true)
@@ -166,7 +166,7 @@ local function WeaponTooltipHasBuff(group, slot)
     end
     -- Read the equipped item itself, including enchants already present at login.
     if not weaponTooltip then
-        weaponTooltip = CreateFrame("GameTooltip", "MiniRemindersWeaponTooltip", UIParent, "GameTooltipTemplate")
+        weaponTooltip = CreateFrame("GameTooltip", "LH_RemindersWeaponTooltip", UIParent, "GameTooltipTemplate")
     end
     weaponTooltip:SetOwner(UIParent, "ANCHOR_NONE")
     weaponTooltip:ClearLines()
@@ -174,8 +174,8 @@ local function WeaponTooltipHasBuff(group, slot)
     local found = false
     if ok then
         for i = 1, weaponTooltip:NumLines() do
-            local left = _G["MiniRemindersWeaponTooltipTextLeft" .. i]
-            local right = _G["MiniRemindersWeaponTooltipTextRight" .. i]
+            local left = _G["LH_RemindersWeaponTooltipTextLeft" .. i]
+            local right = _G["LH_RemindersWeaponTooltipTextRight" .. i]
             if (left and Matches(left:GetText())) or (right and Matches(right:GetText())) then
                 found = true
                 break
@@ -191,9 +191,9 @@ local function SavePosition()
     local x, y = anchor:GetCenter()
     local cx, cy = UIParent:GetCenter()
     if x and cx then
-        MiniRemindersDB.x, MiniRemindersDB.y = x - cx, y - cy
+        LH_RemindersDB.x, LH_RemindersDB.y = x - cx, y - cy
         anchor:ClearAllPoints()
-        anchor:SetPoint("CENTER", UIParent, "CENTER", MiniRemindersDB.x, MiniRemindersDB.y)
+        anchor:SetPoint("CENTER", UIParent, "CENTER", LH_RemindersDB.x, LH_RemindersDB.y)
     end
 end
 
@@ -220,11 +220,11 @@ local function GetButton(index)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         if self.example then
-            GameTooltip:SetText("MiniReminders: Position")
-            GameTooltip:AddLine("Mit linker Maustaste ziehen. /minireminders lock", 1, 1, 1, true)
+            GameTooltip:SetText("LH_Reminders: Position")
+            GameTooltip:AddLine("Left-drag to move. /lh_reminders lock", 1, 1, 1, true)
         else
             GameTooltip:SetSpellByID(self.spellID)
-            GameTooltip:AddLine("Buff fehlt", 1, 0.8, 0.15)
+            GameTooltip:AddLine("Missing buff", 1, 0.8, 0.15)
         end
         GameTooltip:Show()
     end)
@@ -254,7 +254,7 @@ local function Refresh()
             else
                 active = HasBuff(group)
             end
-            if not active and not MiniRemindersDB.exceptions[BuffName(group.name)] then
+            if not active and not LH_RemindersDB.exceptions[BuffName(group.name)] then
                 missing[#missing + 1] = group
             end
         end
@@ -283,8 +283,8 @@ local function Refresh()
     end
 end
 
-SLASH_MINIREMINDERS1 = "/minireminders"
-SlashCmdList.MINIREMINDERS = function(message)
+SLASH_LH_REMINDERS1 = "/lh_reminders"
+SlashCmdList.LH_REMINDERS = function(message)
     local input = (message or ""):match("^%s*(.-)%s*$")
     local command, argument = input:match("^(%S+)%s*(.-)$")
     command = (command or ""):lower()
@@ -292,26 +292,26 @@ SlashCmdList.MINIREMINDERS = function(message)
         local first, last = argument:sub(1, 1), argument:sub(-1)
         if first == '"' or first == "'" then
             if last ~= first or #argument < 2 then
-                print('MiniReminders: /minireminders ' .. command .. ' "Zaubername"')
+                print('LH_Reminders: /lh_reminders ' .. command .. ' "Spell name"')
                 return
             end
             argument = argument:sub(2, -2)
         end
         local name = BuffName(argument)
         if not name or name == "" or argument:find('["\']') then
-            print('MiniReminders: /minireminders ' .. command .. ' "Zaubername"')
+            print('LH_Reminders: /lh_reminders ' .. command .. ' "Spell name"')
             return
         end
         if not initialized then return end
-        MiniRemindersDB.exceptions[name] = command == "except" and true or nil
-        print("MiniReminders: " .. argument .. (command == "except" and " deaktiviert." or " aktiviert.")
-            .. (InCombat() and " Anzeige wird nach dem Kampf aktualisiert." or ""))
+        LH_RemindersDB.exceptions[name] = command == "except" and true or nil
+        print("LH_Reminders: " .. argument .. (command == "except" and " disabled." or " enabled.")
+            .. (InCombat() and " The display will update after combat." or ""))
         Refresh()
         return
     end
     if argument ~= "" then command = "" end
     if (command == "unlock" or command == "lock") and InCombat() then
-        print("MiniReminders: Position nach dem Kampf bearbeiten.")
+        print("LH_Reminders: Edit the position after combat.")
         return
     end
     if command == "unlock" then
@@ -320,7 +320,7 @@ SlashCmdList.MINIREMINDERS = function(message)
         if initialized then SavePosition() end
         unlocked = false
     else
-        print('MiniReminders: /minireminders unlock | lock | except "Zaubername" | allow "Zaubername"')
+        print('LH_Reminders: /lh_reminders unlock | lock | except "Spell name" | allow "Spell name"')
         return
     end
     Refresh()
@@ -329,10 +329,10 @@ end
 anchor:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
         if unit ~= addonName then return end
-        MiniRemindersDB = type(MiniRemindersDB) == "table" and MiniRemindersDB or {}
-        if type(MiniRemindersDB.exceptions) ~= "table" then MiniRemindersDB.exceptions = {} end
-        local x = tonumber(MiniRemindersDB.x) or 0
-        local y = tonumber(MiniRemindersDB.y) or -120
+        LH_RemindersDB = type(LH_RemindersDB) == "table" and LH_RemindersDB or {}
+        if type(LH_RemindersDB.exceptions) ~= "table" then LH_RemindersDB.exceptions = {} end
+        local x = tonumber(LH_RemindersDB.x) or 0
+        local y = tonumber(LH_RemindersDB.y) or -120
         anchor:SetPoint("CENTER", UIParent, "CENTER", x, y)
         initialized = true
         BuildGroups()
