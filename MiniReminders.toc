@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: MiniReminders
+## Notes: Reminds you of missing class buffs.
+## Author: MiniReminders
+## Version: 0.2.0
+## SavedVariablesPerCharacter: MiniRemindersDB
+
+MiniReminders.lua
