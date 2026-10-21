@@ -1,6 +1,6 @@
 # MiniReminders
 
-WoW Forever (Interface 16001), Version 0.2.0.
+WoW Forever (Interface 16001), Version 0.3.0.
 
 Erinnert Schamanen an eine fehlende Waffenverzauberung und ein fehlendes Schild.
 Eine beliebige aktive Waffenverzauberung auf einer der beiden Waffen genügt.
@@ -21,6 +21,13 @@ Hinweise werden nach Kampfende aktualisiert. Verschieben ist außerhalb des Kamp
   linker Maustaste ziehen, um die Position zu ändern.
 - `/minireminders lock`: Fixiert die Position und ersetzt das Beispiel durch die
   tatsächlich fehlenden Buffs.
+- `/minireminders except "Lightning Shield"`: Deaktiviert den Hinweis für diesen
+  Buff. Alle Ränge zählen zusammen; Groß-/Kleinschreibung wird ignoriert.
+- `/minireminders allow "Lightning Shield"`: Aktiviert den Hinweis wieder.
+
+Ausnahmen gelten für den jeweils vorgeschlagenen Buff und werden pro Charakter
+gespeichert. Im Kampf wird die Anzeige nach Kampfende angepasst. Das Beispiel-Symbol
+im Verschiebemodus bleibt unabhängig von Ausnahmen sichtbar.
 
 Die Position wird pro Charakter gespeichert. Nach dem Anlegen des AddOns das Spiel
 neu starten, falls es in der AddOn-Liste noch nicht erscheint.

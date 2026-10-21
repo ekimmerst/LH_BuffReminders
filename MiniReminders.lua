@@ -42,6 +42,8 @@ local function BuffName(name)
         ["waffe des felsbeissers"] = "felsbeißer", ["felsbeisser"] = "felsbeißer",
         ["flametongue weapon"] = "flametongue", ["frostbrand weapon"] = "frostbrand",
         ["windfury weapon"] = "windfury", ["earthliving weapon"] = "earthliving",
+        ["blitzschlagschild"] = "lightning shield", ["wasserschild"] = "water shield",
+        ["erdschild"] = "earth shield",
     }
     return aliases[name] or name
 end
@@ -252,7 +254,9 @@ local function Refresh()
             else
                 active = HasBuff(group)
             end
-            if not active then missing[#missing + 1] = group end
+            if not active and not MiniRemindersDB.exceptions[BuffName(group.name)] then
+                missing[#missing + 1] = group
+            end
         end
     end
     -- Hiding a dragged button interrupts WoW's drag capture. Keep visible
@@ -281,7 +285,31 @@ end
 
 SLASH_MINIREMINDERS1 = "/minireminders"
 SlashCmdList.MINIREMINDERS = function(message)
-    local command = (message or ""):match("^%s*(.-)%s*$"):lower()
+    local input = (message or ""):match("^%s*(.-)%s*$")
+    local command, argument = input:match("^(%S+)%s*(.-)$")
+    command = (command or ""):lower()
+    if command == "except" or command == "allow" then
+        local first, last = argument:sub(1, 1), argument:sub(-1)
+        if first == '"' or first == "'" then
+            if last ~= first or #argument < 2 then
+                print('MiniReminders: /minireminders ' .. command .. ' "Zaubername"')
+                return
+            end
+            argument = argument:sub(2, -2)
+        end
+        local name = BuffName(argument)
+        if not name or name == "" or argument:find('["\']') then
+            print('MiniReminders: /minireminders ' .. command .. ' "Zaubername"')
+            return
+        end
+        if not initialized then return end
+        MiniRemindersDB.exceptions[name] = command == "except" and true or nil
+        print("MiniReminders: " .. argument .. (command == "except" and " deaktiviert." or " aktiviert.")
+            .. (InCombat() and " Anzeige wird nach dem Kampf aktualisiert." or ""))
+        Refresh()
+        return
+    end
+    if argument ~= "" then command = "" end
     if (command == "unlock" or command == "lock") and InCombat() then
         print("MiniReminders: Position nach dem Kampf bearbeiten.")
         return
@@ -292,7 +320,7 @@ SlashCmdList.MINIREMINDERS = function(message)
         if initialized then SavePosition() end
         unlocked = false
     else
-        print("MiniReminders: /minireminders unlock | /minireminders lock")
+        print('MiniReminders: /minireminders unlock | lock | except "Zaubername" | allow "Zaubername"')
         return
     end
     Refresh()
@@ -302,6 +330,7 @@ anchor:SetScript("OnEvent", function(_, event, unit)
     if event == "ADDON_LOADED" then
         if unit ~= addonName then return end
         MiniRemindersDB = type(MiniRemindersDB) == "table" and MiniRemindersDB or {}
+        if type(MiniRemindersDB.exceptions) ~= "table" then MiniRemindersDB.exceptions = {} end
         local x = tonumber(MiniRemindersDB.x) or 0
         local y = tonumber(MiniRemindersDB.y) or -120
         anchor:SetPoint("CENTER", UIParent, "CENTER", x, y)

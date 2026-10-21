@@ -29,13 +29,14 @@ function UnitClass() return 'Shaman',class end
 function GetSpellInfo(id)
  if id==8017 then return 'Rockbiter Weapon',nil,'Icon'..id end
  if id==8018 then return 'Rockbiter Weapon 2',nil,'Icon'..id end
+ if id==324 then return 'Lightning Shield',nil,'Icon'..id end
  return 'Spell'..id,nil,'Icon'..id
 end
 function IsPlayerSpell(id) return id==8017 or id==324 end
 function GetWeaponEnchantInfo() return enchanted,nil,nil,nil,false end
 function GetInventoryItemLink() if weapon then return 'weapon' end end
 function UnitIsDeadOrGhost() return dead end
-function UnitBuff(_,i) if shield and i==1 then return 'Spell324' end end
+function UnitBuff(_,i) if shield and i==1 then return 'Lightning Shield' end end
 assert(loadfile('MiniReminders/MiniReminders.lua'))('MiniReminders')
 local f=MiniRemindersFrame
 local function event(e,u) f.scripts.OnEvent(f,e,u) end
@@ -128,4 +129,27 @@ dead=false; weapon=false; event('PLAYER_ALIVE'); assert(#visible()==1)
 class='MAGE'; event('SPELLS_CHANGED'); assert(#visible()==0)
 SlashCmdList.MINIREMINDERS('unlock'); assert(#visible()==1)
 SlashCmdList.MINIREMINDERS('lock'); assert(#visible()==0)
+class='SHAMAN'; weapon=true; enchanted=false; shield=false; tooltipLines={}
+event('SPELLS_CHANGED'); assert(#visible()==2)
+SlashCmdList.MINIREMINDERS('except "Lightning Shield"')
+assert(#visible()==1 and visible()[1].spellID==8017)
+assert(MiniRemindersDB.exceptions['lightning shield'])
+event('ADDON_LOADED','MiniReminders'); event('PLAYER_ENTERING_WORLD')
+assert(#visible()==1, 'Exception did not survive initialization')
+SlashCmdList.MINIREMINDERS('  ALLOW "LIGHTNING SHIELD 2"  '); assert(#visible()==2)
+SlashCmdList.MINIREMINDERS('except "Blitzschlagschild"'); assert(#visible()==1)
+SlashCmdList.MINIREMINDERS('allow Lightning Shield'); assert(#visible()==2)
+for _,cmd in ipairs({'except', 'except ""', 'except "Lightning Shield', 'except "Lightning Shield" extra', 'allow "'}) do
+ SlashCmdList.MINIREMINDERS(cmd)
+ assert(#visible()==2 and next(MiniRemindersDB.exceptions)==nil, 'Invalid input changed exceptions')
+end
+combat=true
+SlashCmdList.MINIREMINDERS('except "Lightning Shield"'); assert(#visible()==2)
+combat=false; event('PLAYER_REGEN_ENABLED'); assert(#visible()==1)
+SlashCmdList.MINIREMINDERS('unlock'); assert(#visible()==1 and visible()[1].example)
+SlashCmdList.MINIREMINDERS('except "Rockbiter 2"'); assert(#visible()==1 and visible()[1].example)
+SlashCmdList.MINIREMINDERS('lock'); assert(#visible()==0)
+SlashCmdList.MINIREMINDERS('allow "Rockbiter Weapon"'); assert(#visible()==1)
+SlashCmdList.MINIREMINDERS('allow "Lightning Shield"'); assert(#visible()==2)
+print('PASS: persistent per-buff exceptions, allow, ranks, quotes, invalid input, combat deferral and unlock preview')
 print('PASS: pre-existing login enchant, modern/legacy weapon tooltips, rank 2 casting attributes, aura ranks, expiry, combat deferral, stable dragging, layout and class filtering')
