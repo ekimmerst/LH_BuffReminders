@@ -1,4 +1,5 @@
 ## Interface: 16001
+## Dependencies: LH_Tweaks
 ## Title: LH_Reminders
 ## Notes: Reminds you of missing class buffs.
 ## Author: LH_Reminders

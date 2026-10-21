@@ -33,3 +33,7 @@ To retain your position and exceptions, close WoW and back up each character's `
 - Changed the chat command to `/lh_reminders`.
 - Translated documentation, chat messages and addon tooltip instructions into English.
 - Added instructions for transferring the saved position and buff exceptions.
+
+## Required core addon
+
+Install and enable **LH_Tweaks** alongside this addon. LH_Tweaks is the shared LiteHawk configuration host and must load first. CurseForge releases must list LH_Tweaks as a required dependency so the client installs it automatically.
