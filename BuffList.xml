@@ -1,5 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
-    <Frame name="LHRemindersBuffListTemplate" mixin="LHRemindersBuffListMixin" virtual="true">
+    <Frame name="LHBuffRemindersBuffListTemplate" mixin="LHBuffRemindersBuffListMixin" virtual="true">
         <Size x="460" y="284"/>
         <Scripts>
             <OnLoad>self:OnLoad()</OnLoad>

@@ -1,6 +1,6 @@
 local addonName = ...
 local Addon = {}
-LH_Reminders = Addon
+LH_BuffReminders = Addon
 local SIZE, GAP = 36, 8
 local unlocked, initialized = false, false
 local buttons, groups = {}, {}
@@ -13,7 +13,7 @@ end
 -- Tracks the combat state from events too; secure frames are only locked by InCombat().
 local fighting = false
 local function Fighting() return fighting or InCombat() end
-local anchor = CreateFrame("Frame", "LH_RemindersFrame", UIParent)
+local anchor = CreateFrame("Frame", "LH_BuffRemindersFrame", UIParent)
 anchor:SetSize(SIZE, SIZE)
 anchor:SetMovable(true)
 anchor:SetClampedToScreen(true)
@@ -90,10 +90,10 @@ end
 local function ClassConfig()
     local class = CurrentClass()
     if not class then return end
-    LH_RemindersClassDB = type(LH_RemindersClassDB) == "table" and LH_RemindersClassDB or {}
-    local value = LH_RemindersClassDB[class]
+    LH_BuffRemindersClassDB = type(LH_BuffRemindersClassDB) == "table" and LH_BuffRemindersClassDB or {}
+    local value = LH_BuffRemindersClassDB[class]
     if type(value) ~= "table" then
-        local legacy = type(LH_RemindersDB) == "table" and LH_RemindersDB or {}
+        local legacy = type(LH_BuffRemindersDB) == "table" and LH_BuffRemindersDB or {}
         local exceptions = {}
         if type(legacy.exceptions) == "table" then
             for name, excluded in pairs(legacy.exceptions) do
@@ -106,7 +106,7 @@ local function ClassConfig()
             exceptions = exceptions,
             monitored = class == "SHAMAN" and {{kind = "weapon"}, {kind = "shield"}} or {},
         }
-        LH_RemindersClassDB[class] = value
+        LH_BuffRemindersClassDB[class] = value
     end
     if type(value.monitored) ~= "table" then value.monitored = {} end
     if type(value.exceptions) ~= "table" then value.exceptions = {} end
@@ -431,7 +431,7 @@ local function WeaponTooltipHasBuff(group, slot)
     end
     -- Read the equipped item itself, including enchants already present at login.
     if not weaponTooltip then
-        weaponTooltip = CreateFrame("GameTooltip", "LH_RemindersWeaponTooltip", UIParent, "GameTooltipTemplate")
+        weaponTooltip = CreateFrame("GameTooltip", "LH_BuffRemindersWeaponTooltip", UIParent, "GameTooltipTemplate")
     end
     weaponTooltip:SetOwner(UIParent, "ANCHOR_NONE")
     weaponTooltip:ClearLines()
@@ -439,8 +439,8 @@ local function WeaponTooltipHasBuff(group, slot)
     local found = false
     if ok then
         for i = 1, weaponTooltip:NumLines() do
-            local left = _G["LH_RemindersWeaponTooltipTextLeft" .. i]
-            local right = _G["LH_RemindersWeaponTooltipTextRight" .. i]
+            local left = _G["LH_BuffRemindersWeaponTooltipTextLeft" .. i]
+            local right = _G["LH_BuffRemindersWeaponTooltipTextRight" .. i]
             if (left and Matches(left:GetText())) or (right and Matches(right:GetText())) then
                 found = true
                 break
@@ -486,8 +486,8 @@ local function GetButton(index)
         if self:GetAlpha() == 0 then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         if self.example then
-            GameTooltip:SetText("LH_Reminders: Position")
-            GameTooltip:AddLine("Left-drag to move. /lh_reminders lock", 1, 1, 1, true)
+            GameTooltip:SetText("LH_BuffReminders: Position")
+            GameTooltip:AddLine("Left-drag to move. /lh_buffreminders lock", 1, 1, 1, true)
         else
             GameTooltip:SetSpellByID(self.spellID)
             GameTooltip:AddLine("Missing buff", 1, 0.8, 0.15)
@@ -719,7 +719,7 @@ local reportLines, reportFrame = {}, nil
 local function Out(text) reportLines[#reportLines + 1] = text end
 local function ShowReport()
     if not reportFrame then
-        reportFrame = CreateFrame("Frame", "LH_RemindersReport", UIParent, "BackdropTemplate")
+        reportFrame = CreateFrame("Frame", "LH_BuffRemindersReport", UIParent, "BackdropTemplate")
         reportFrame:SetSize(620, 360)
         reportFrame:SetPoint("CENTER")
         reportFrame:SetFrameStrata("DIALOG")
@@ -733,7 +733,7 @@ local function ShowReport()
         reportFrame:SetBackdropColor(0, 0, 0, 0.95)
         local hint = reportFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         hint:SetPoint("TOPLEFT", 12, -10)
-        hint:SetText("LH_Reminders report - Ctrl+A, Ctrl+C to copy, Esc to close")
+        hint:SetText("LH_BuffReminders report - Ctrl+A, Ctrl+C to copy, Esc to close")
         local scroll = CreateFrame("ScrollFrame", nil, reportFrame, "UIPanelScrollFrameTemplate")
         scroll:SetPoint("TOPLEFT", 12, -30)
         scroll:SetPoint("BOTTOMRIGHT", -32, 12)
@@ -755,8 +755,8 @@ local function ShowReport()
     reportFrame.edit:SetFocus()
 end
 
-SLASH_LH_REMINDERS1 = "/lh_reminders"
-SlashCmdList.LH_REMINDERS = function(message)
+SLASH_LH_BUFFREMINDERS1 = "/lh_buffreminders"
+SlashCmdList.LH_BUFFREMINDERS = function(message)
     local input = (message or ""):match("^%s*(.-)%s*$")
     local command, argument = input:match("^(%S+)%s*(.-)$")
     command = (command or ""):lower()
@@ -764,19 +764,19 @@ SlashCmdList.LH_REMINDERS = function(message)
         local first, last = argument:sub(1, 1), argument:sub(-1)
         if first == '"' or first == "'" then
             if last ~= first or #argument < 2 then
-                print('LH_Reminders: /lh_reminders ' .. command .. ' "Spell name"')
+                print('LH_BuffReminders: /lh_buffreminders ' .. command .. ' "Spell name"')
                 return
             end
             argument = argument:sub(2, -2)
         end
         local name = BuffName(argument)
         if not name or name == "" or argument:find('["\']') then
-            print('LH_Reminders: /lh_reminders ' .. command .. ' "Spell name"')
+            print('LH_BuffReminders: /lh_buffreminders ' .. command .. ' "Spell name"')
             return
         end
         if not initialized then return end
         config.exceptions[name] = command == "except" and true or nil
-        print("LH_Reminders: " .. argument .. (command == "except" and " disabled." or " enabled.")
+        print("LH_BuffReminders: " .. argument .. (command == "except" and " disabled." or " enabled.")
             .. (InCombat() and " The display will update after combat." or ""))
         Refresh()
         return
@@ -792,7 +792,7 @@ SlashCmdList.LH_REMINDERS = function(message)
             Out("  group " .. tostring(group.name) .. ": auraID=" .. tostring(group.auraID)
                 .. " carried=" .. tostring(group.carried) .. " castAt=" .. tostring(group.castAt))
         end
-        Out("LH_Reminders probe: lockdown=" .. tostring(InCombat()) .. " lastPayload=[" .. lastPayloadDetail .. "]")
+        Out("LH_BuffReminders probe: lockdown=" .. tostring(InCombat()) .. " lastPayload=[" .. lastPayloadDetail .. "]")
         if UnitBuff then Try("UnitBuff(1)", UnitBuff, "player", 1) end
         if UnitAura then Try("UnitAura(1)", UnitAura, "player", 1, "HELPFUL") end
         local A = C_UnitAuras
@@ -821,7 +821,7 @@ SlashCmdList.LH_REMINDERS = function(message)
         return
     end
     if command == "debug" then
-        Out("LH_Reminders: lockdown=" .. tostring(InCombat()) .. " fighting=" .. tostring(fighting)
+        Out("LH_BuffReminders: lockdown=" .. tostring(InCombat()) .. " fighting=" .. tostring(fighting)
             .. " enabled=" .. tostring(config and config.enabled))
         Out("  last UNIT_AURA payload: " .. lastAuraInfo .. " [" .. lastPayloadDetail .. "]"
             .. " | GetPlayerAuraBySpellID=" .. tostring(C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID ~= nil)
@@ -865,7 +865,7 @@ SlashCmdList.LH_REMINDERS = function(message)
         return
     end
     if (command == "unlock" or command == "lock") and InCombat() then
-        print("LH_Reminders: Edit the position after combat.")
+        print("LH_BuffReminders: Edit the position after combat.")
         return
     end
     if command == "unlock" then
@@ -876,7 +876,7 @@ SlashCmdList.LH_REMINDERS = function(message)
         unlocked = false
         if config then config.locked = true end
     else
-        print('LH_Reminders: /lh_reminders unlock | lock | debug | except "Spell name" | allow "Spell name"')
+        print('LH_BuffReminders: /lh_buffreminders unlock | lock | debug | except "Spell name" | allow "Spell name"')
         return
     end
     Refresh()
@@ -892,7 +892,7 @@ end
 anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
     if event == "ADDON_LOADED" then
         if unit ~= addonName then return end
-        LH_RemindersDB = type(LH_RemindersDB) == "table" and LH_RemindersDB or {}
+        LH_BuffRemindersDB = type(LH_BuffRemindersDB) == "table" and LH_BuffRemindersDB or {}
         SelectConfig()
         initialized = true
         fighting = UnitAffectingCombat and UnitAffectingCombat("player") or false

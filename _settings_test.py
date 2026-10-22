@@ -6,7 +6,7 @@ sys.path.insert(0, str(root / 'LH_Tweaks/.test-runtime'))
 from lupa.lua51 import LuaRuntime
 
 lua = LuaRuntime(unpack_returned_tuples=True)
-lua.execute((root / 'LH_Reminders/_test.lua').read_text(encoding='utf-8'))
+lua.execute((root / 'LH_BuffReminders/_test.lua').read_text(encoding='utf-8'))
 lua.execute('''
 local oldInfo,oldKnown=GetSpellInfo,IsPlayerSpell
 GetSpellInfo=function(id)
@@ -19,37 +19,37 @@ GetNumSpellTabs=function() return 1 end
 GetSpellTabInfo=function() return 'Hunter',nil,0,2 end
 GetSpellBookItemInfo=function(slot) return 'SPELL',slot==1 and 13165 or 5118 end
 TestRemindersSetClass('HUNTER')
-assert(#LH_Reminders:GetMonitored()==0 and LH_RemindersClassDB.HUNTER.enabled)
-local ok,message=LH_Reminders:AddBuff('Aspect of the Hawk')
-assert(ok and #LH_Reminders:GetMonitored()==1,message)
-assert(LH_Reminders:GetEntry(1)=='Aspect of the Hawk')
-ok=LH_Reminders:AddBuff('13165');assert(not ok and #LH_Reminders:GetMonitored()==1)
-ok=LH_Reminders:AddBuff('unknown');assert(not ok)
+assert(#LH_BuffReminders:GetMonitored()==0 and LH_BuffRemindersClassDB.HUNTER.enabled)
+local ok,message=LH_BuffReminders:AddBuff('Aspect of the Hawk')
+assert(ok and #LH_BuffReminders:GetMonitored()==1,message)
+assert(LH_BuffReminders:GetEntry(1)=='Aspect of the Hawk')
+ok=LH_BuffReminders:AddBuff('13165');assert(not ok and #LH_BuffReminders:GetMonitored()==1)
+ok=LH_BuffReminders:AddBuff('unknown');assert(not ok)
 local shown=TestRemindersVisible()
 assert(#shown==1 and shown[1].spellID==13165 and shown[1].attributes.spell=='Aspect of the Hawk')
 local oldBuff=UnitBuff
 UnitBuff=function(_,index) if index==1 then return 'Aspect of the Hawk' end end
 TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
 UnitBuff=oldBuff;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
-LH_Reminders:SetEnabled(false);assert(#TestRemindersVisible()==0)
-LH_Reminders:SetEnabled(true);assert(#TestRemindersVisible()==1)
-TestRemindersSetClass('MAGE');assert(#LH_Reminders:GetMonitored()==0 and #TestRemindersVisible()==0)
-TestRemindersSetClass('HUNTER');assert(#LH_Reminders:GetMonitored()==1 and #TestRemindersVisible()==1)
-assert(LH_RemindersClassDB.SHAMAN.monitored[1].kind=='weapon')
+LH_BuffReminders:SetEnabled(false);assert(#TestRemindersVisible()==0)
+LH_BuffReminders:SetEnabled(true);assert(#TestRemindersVisible()==1)
+TestRemindersSetClass('MAGE');assert(#LH_BuffReminders:GetMonitored()==0 and #TestRemindersVisible()==0)
+TestRemindersSetClass('HUNTER');assert(#LH_BuffReminders:GetMonitored()==1 and #TestRemindersVisible()==1)
+assert(LH_BuffRemindersClassDB.SHAMAN.monitored[1].kind=='weapon')
 local hunterKnown,hunterTabs=IsPlayerSpell,GetNumSpellTabs
 IsPlayerSpell=function(id) return id~=13165 and hunterKnown(id) end
 GetNumSpellTabs=function() return 0 end
 TestRemindersEvent('SPELLS_CHANGED')
-assert(#LH_Reminders:GetMonitored()==1 and #TestRemindersVisible()==0)
+assert(#LH_BuffReminders:GetMonitored()==1 and #TestRemindersVisible()==0)
 IsPlayerSpell=hunterKnown;GetNumSpellTabs=hunterTabs
 TestRemindersEvent('SPELLS_CHANGED');assert(#TestRemindersVisible()==1)
-LH_RemindersDB={x=15,y=-37,exceptions={fortitude=true}}
+LH_BuffRemindersDB={x=15,y=-37,exceptions={fortitude=true}}
 TestRemindersSetClass('PRIEST')
-assert(LH_RemindersClassDB.PRIEST.x==15 and LH_RemindersClassDB.PRIEST.y==-37)
-assert(LH_RemindersClassDB.PRIEST.exceptions.fortitude)
-LH_RemindersDB={x=99,y=99}
+assert(LH_BuffRemindersClassDB.PRIEST.x==15 and LH_BuffRemindersClassDB.PRIEST.y==-37)
+assert(LH_BuffRemindersClassDB.PRIEST.exceptions.fortitude)
+LH_BuffRemindersDB={x=99,y=99}
 TestRemindersSetClass('HUNTER')
-assert(#LH_Reminders:GetMonitored()==1 and LH_RemindersClassDB.HUNTER.x~=99)
+assert(#LH_BuffReminders:GetMonitored()==1 and LH_BuffRemindersClassDB.HUNTER.x~=99)
 
 methods=getmetatable(UIParent).__index
 function methods:CreateFontString() return setmetatable({}, {__index=methods}) end
@@ -96,41 +96,41 @@ lua.execute('local Hub=LH_Tweaks\nfunction Hub:RegisterModule(id, title, build)'
 source = (root / 'LH_Tweaks/Settings.lua').read_text(encoding='utf-8')
 registration = source.split('function Hub:RegisterModulePage(id)')[1].split('\nlocal function RegisterSettings')[0]
 lua.execute('local Hub=LH_Tweaks\nfunction Hub:RegisterModulePage(id)' + registration)
-lua.execute((root / 'LH_Reminders/Settings.lua').read_text(encoding='utf-8'), 'LH_Reminders')
+lua.execute((root / 'LH_BuffReminders/Settings.lua').read_text(encoding='utf-8'), 'LH_BuffReminders')
 lua.execute('''
-assert(registered.parent==LH_Tweaks.category and registered.title=='LH Reminders')
-assert(panelInitializer.template=='LHRemindersBuffListTemplate')
-assert(registry.LH_Reminders_enabled.get() and not registry.LH_Reminders_unlocked.get())
-registry.LH_Reminders_enabled.set(false);assert(#TestRemindersVisible()==0)
-registry.LH_Reminders_enabled.set(true);assert(#TestRemindersVisible()==1)
-SlashCmdList.LH_REMINDERS('');assert(opened=='LH Reminders')
+assert(registered.parent==LH_Tweaks.category and registered.title=='LH BuffReminders')
+assert(panelInitializer.template=='LHBuffRemindersBuffListTemplate')
+assert(registry.LH_BuffReminders_enabled.get() and not registry.LH_BuffReminders_unlocked.get())
+registry.LH_BuffReminders_enabled.set(false);assert(#TestRemindersVisible()==0)
+registry.LH_BuffReminders_enabled.set(true);assert(#TestRemindersVisible()==1)
+SlashCmdList.LH_BUFFREMINDERS('');assert(opened=='LH BuffReminders')
 local panel=CreateFrame('Frame')
-setmetatable(panel,{__index=function(_,key) return LHRemindersBuffListMixin[key] or methods[key] end})
+setmetatable(panel,{__index=function(_,key) return LHBuffRemindersBuffListMixin[key] or methods[key] end})
 panel:OnLoad();panel:Init(panelInitializer)
 assert(panel.rows[1].name.text=='Aspect of the Hawk' and panel.rows[1].icon.texture=='HawkIcon')
 panel.edit:SetText('Aspect of the Cheetah');panel.add.scripts.OnClick()
-assert(#LH_Reminders:GetMonitored()==2 and panel.rows[2].icon.texture=='CheetahIcon')
+assert(#LH_BuffReminders:GetMonitored()==2 and panel.rows[2].icon.texture=='CheetahIcon')
 panel.rows[1].remove.scripts.OnClick(panel.rows[1].remove)
-assert(#LH_Reminders:GetMonitored()==1 and panel.rows[1].name.text=='Aspect of the Cheetah')
+assert(#LH_BuffReminders:GetMonitored()==1 and panel.rows[1].name.text=='Aspect of the Cheetah')
 panel.edit:SetText('Aspect of the Hawk');panel.edit.scripts.OnEnterPressed()
-assert(#LH_Reminders:GetMonitored()==2 and panel.rows[2].name.text=='Aspect of the Hawk')
-assert(resetButton==nil and LH_Reminders.ResetClass==nil)
+assert(#LH_BuffReminders:GetMonitored()==2 and panel.rows[2].name.text=='Aspect of the Hawk')
+assert(resetButton==nil and LH_BuffReminders.ResetClass==nil)
 ''')
 for ext in ('png', 'tga'):
-    assert (root / f'LH_Reminders/Media/Icon.{ext}').read_bytes() == (root / f'LH_Tweaks/Icon.{ext}').read_bytes()
+    assert (root / f'LH_BuffReminders/Media/Icon.{ext}').read_bytes() == (root / f'LH_Tweaks/Icon.{ext}').read_bytes()
 from xml.etree import ElementTree
 
-buff_template = ElementTree.parse(root / 'LH_Reminders/BuffList.xml').getroot()[0]
-assert buff_template.attrib['name'] == 'LHRemindersBuffListTemplate'
+buff_template = ElementTree.parse(root / 'LH_BuffReminders/BuffList.xml').getroot()[0]
+assert buff_template.attrib['name'] == 'LHBuffRemindersBuffListTemplate'
 assert 'inherits' not in buff_template.attrib, 'A settings-row tooltip frame blocks the buff input'
 print('PASS: class-wide buffs, Hunter aspects, aura matching, activation, native page, icon/name/x/+ controls and shared icon')
 lua.execute('''
 -- Per-buff watching outside and inside combat; combat changes use alpha only.
 TestRemindersSetClass('HUNTER')
-local entry=LH_RemindersClassDB.HUNTER.monitored[1]
-local cheetah=LH_RemindersClassDB.HUNTER.monitored[2]
-LH_Reminders:RemoveBuff(1)
-assert(#LH_Reminders:GetMonitored()==1 and LH_Reminders:GetWatch(1,'ooc') and LH_Reminders:GetWatch(1,'combat'))
+local entry=LH_BuffRemindersClassDB.HUNTER.monitored[1]
+local cheetah=LH_BuffRemindersClassDB.HUNTER.monitored[2]
+LH_BuffReminders:RemoveBuff(1)
+assert(#LH_BuffReminders:GetMonitored()==1 and LH_BuffReminders:GetWatch(1,'ooc') and LH_BuffReminders:GetWatch(1,'combat'))
 local oldBuff=UnitBuff
 local hawk=true
 UnitBuff=function(_,index) if hawk and index==1 then return 'Aspect of the Hawk' end end
@@ -141,14 +141,14 @@ hawk=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible
 hawk=true;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
 hawk=false;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
 -- Not watched in combat: hidden during combat, shown again afterwards.
-LH_Reminders:SetWatch(1,'combat',false);assert(#TestRemindersVisible()==0)
+LH_BuffReminders:SetWatch(1,'combat',false);assert(#TestRemindersVisible()==0)
 TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED');assert(#TestRemindersVisible()==1)
 -- Not watched outside combat: hidden now, shown when combat starts without any layout change.
-LH_Reminders:SetWatch(1,'combat',true);LH_Reminders:SetWatch(1,'ooc',false)
-assert(#TestRemindersVisible()==0 and not LH_Reminders:GetWatch(1,'ooc'))
+LH_BuffReminders:SetWatch(1,'combat',true);LH_BuffReminders:SetWatch(1,'ooc',false)
+assert(#TestRemindersVisible()==0 and not LH_BuffReminders:GetWatch(1,'ooc'))
 TestRemindersCombat(true);TestRemindersEvent('PLAYER_REGEN_DISABLED');assert(#TestRemindersVisible()==1)
 TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED');assert(#TestRemindersVisible()==0)
-LH_Reminders:SetWatch(1,'ooc',true);assert(#TestRemindersVisible()==1)
+LH_BuffReminders:SetWatch(1,'ooc',true);assert(#TestRemindersVisible()==1)
 -- Combat restrictions can hide aura data; the player's own cast then hides the reminder.
 local secret={}
 local oldSecret,oldTime=issecretvalue,GetTime
@@ -245,5 +245,5 @@ UnitBuff=oldBuff
 print('PASS: per-buff out-of-combat/in-combat watching and in-combat icon removal and reappearance')
 lua.execute('''
 -- Diagnostic commands must not raise errors.
-SlashCmdList.LH_REMINDERS('debug');SlashCmdList.LH_REMINDERS('probe')
+SlashCmdList.LH_BUFFREMINDERS('debug');SlashCmdList.LH_BUFFREMINDERS('probe')
 ''')

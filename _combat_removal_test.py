@@ -7,10 +7,10 @@ root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root / 'LH_Tweaks/.test-runtime'))
 from lupa.lua51 import LuaRuntime
 
-assert 'COMBAT_LOG_EVENT_UNFILTERED' not in (root / 'LH_Reminders/LH_Reminders.lua').read_text(encoding='utf-8')
+assert 'COMBAT_LOG_EVENT_UNFILTERED' not in (root / 'LH_BuffReminders/LH_BuffReminders.lua').read_text(encoding='utf-8')
 os.chdir(root)
 lua = LuaRuntime(unpack_returned_tuples=True)
-lua.execute((root / 'LH_Reminders/_test.lua').read_text(encoding='utf-8'))
+lua.execute((root / 'LH_BuffReminders/_test.lua').read_text(encoding='utf-8'))
 lua.execute('''
 local originalInfo, originalKnown = GetSpellInfo, IsPlayerSpell
 GetSpellInfo = function(id)
@@ -24,7 +24,7 @@ GetSpellBookItemInfo = function() return 'SPELL', 6673 end
 local now = 100
 GetTime = function() return now end
 TestRemindersSetClass('WARRIOR')
-assert(LH_Reminders:AddBuff('Battle Shout'))
+assert(LH_BuffReminders:AddBuff('Battle Shout'))
 local aura = {name='Battle Shout', spellId=6673, auraInstanceID=77}
 C_UnitAuras = {GetUnitAuras=function() return {aura} end}
 TestRemindersEvent('UNIT_AURA', 'player')

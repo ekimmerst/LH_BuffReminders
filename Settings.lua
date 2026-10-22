@@ -1,5 +1,5 @@
 local addonName = ...
-local Addon = LH_Reminders
+local Addon = LH_BuffReminders
 local variables = {}
 
 function Addon:RefreshSettings()
@@ -14,14 +14,14 @@ function Addon:RefreshSettings()
 end
 
 local function Proxy(category, key, label, default, get, set)
-    local variable = "LH_Reminders_" .. key
+    local variable = "LH_BuffReminders_" .. key
     variables[#variables + 1] = variable
     return Settings.RegisterProxySetting(category, variable, "boolean", label, default, get, set)
 end
 
-LHRemindersBuffListMixin = {}
+LHBuffRemindersBuffListMixin = {}
 
-function LHRemindersBuffListMixin:OnLoad()
+function LHBuffRemindersBuffListMixin:OnLoad()
     Addon.listPanels = Addon.listPanels or {}
     Addon.listPanels[#Addon.listPanels + 1] = self
     local note = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -69,19 +69,19 @@ function LHRemindersBuffListMixin:OnLoad()
     edit:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
 end
 
-function LHRemindersBuffListMixin:Init(initializer)
+function LHBuffRemindersBuffListMixin:Init(initializer)
     self:RefreshList()
 end
 
-function LHRemindersBuffListMixin:Release()
+function LHBuffRemindersBuffListMixin:Release()
     if self.edit then self.edit:ClearFocus() end
 end
 
-function LHRemindersBuffListMixin:OnShow()
+function LHBuffRemindersBuffListMixin:OnShow()
     self:RefreshList()
 end
 
-function LHRemindersBuffListMixin:RefreshList()
+function LHBuffRemindersBuffListMixin:RefreshList()
     if not self.rows then return end
     local monitored = Addon:GetMonitored()
     for index, entry in ipairs(monitored) do
@@ -143,12 +143,12 @@ local function Build(category, layout)
         "Show reminders for missing selected buffs. Saved for all characters of this class.")
     local unlocked = Proxy(category, "unlocked", "Unlock and preview", false,
         function() local db = Addon:GetConfig(); return db and not db.locked end,
-        function(value) SlashCmdList.LH_REMINDERS(value and "unlock" or "lock") end)
+        function(value) SlashCmdList.LH_BUFFREMINDERS(value and "unlock" or "lock") end)
     local unlockRow = Settings.CreateCheckbox(category, unlocked,
         "Show a draggable preview icon. Position is shared by all characters of this class.")
     unlockRow:SetParentInitializer(enabledRow)
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Buffs for " .. (select(1, UnitClass("player")) or "your class")))
-    layout:AddInitializer(Settings.CreatePanelInitializer("LHRemindersBuffListTemplate", {name = "Monitored buffs"}))
+    layout:AddInitializer(Settings.CreatePanelInitializer("LHBuffRemindersBuffListTemplate", {name = "Monitored buffs"}))
 end
 
-LH_Tweaks:RegisterModule(addonName, "LH Reminders", Build)
+LH_Tweaks:RegisterModule(addonName, "LH BuffReminders", Build)
