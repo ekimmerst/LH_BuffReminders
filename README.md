@@ -1,5 +1,7 @@
 <h1 style="color: #d9a94b;">LH BuffReminders</h1>
 
+<p>Get a small, movable on-screen reminder when a selected class buff is missing, with separate checks in and out of combat.</p>
+
 <p>For the buff you meant to cast before setting off. LH BuffReminders gives you a small on-screen reminder when one of your chosen class buffs is missing.</p>
 
 <h2 style="color: #73c9c4;">Choose your reminders</h2>
