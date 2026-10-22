@@ -16,10 +16,6 @@
 
 <p>Open <strong>Options → AddOns → LH Tweaks → LH BuffReminders</strong> to enable reminders, add or remove buffs and set when each one should be watched. The list accepts learned buff names or IDs.</p>
 
-<h2 style="color: #c78be6;">Upgrading from LH Reminders</h2>
-
-<p>Replace the old <code>LH_Reminders</code> addon folder with <code>LH_BuffReminders</code> and restart WoW. To keep your class-wide buff lists and positions, close WoW first, copy <code>WTF/Account/&lt;account&gt;/SavedVariables/LH_Reminders.lua</code> to <code>LH_BuffReminders.lua</code>, and replace <code>LH_RemindersClassDB</code> with <code>LH_BuffRemindersClassDB</code> inside the copy. If you also have older per-character settings to keep, copy each character's <code>SavedVariables/LH_Reminders.lua</code> to <code>LH_BuffReminders.lua</code> and replace <code>LH_RemindersDB</code> with <code>LH_BuffRemindersDB</code> inside that copy. Keep the original files as backups until you have checked your settings in game.</p>
-
 <h2 style="color: #73c9c4;">More LH addons</h2>
 
 <p>Choose only the pieces you want. Each companion addon also requires LH Tweaks.</p>
