@@ -135,18 +135,19 @@ end
 
 local function Build(category, layout)
     Addon.category = category
+    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Positioning"))
+    local locked = Proxy(category, "locked", "Lock reminder icon", true,
+        function() local db = Addon:GetConfig(); return not db or db.locked ~= false end,
+        function(value) SlashCmdList.LH_BUFFREMINDERS(value and "lock" or "unlock") end)
+    Settings.CreateCheckbox(category, locked,
+        "Disable to show and drag the preview icon. Position is shared by all characters of this class.")
+
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Reminders"))
     local enabled = Proxy(category, "enabled", "Enable reminders", true,
         function() local db = Addon:GetConfig(); return db and db.enabled end,
         function(value) Addon:SetEnabled(value) end)
-    local enabledRow = Settings.CreateCheckbox(category, enabled,
+    Settings.CreateCheckbox(category, enabled,
         "Show reminders for missing selected buffs. Saved for all characters of this class.")
-    local unlocked = Proxy(category, "unlocked", "Unlock and preview", false,
-        function() local db = Addon:GetConfig(); return db and not db.locked end,
-        function(value) SlashCmdList.LH_BUFFREMINDERS(value and "unlock" or "lock") end)
-    local unlockRow = Settings.CreateCheckbox(category, unlocked,
-        "Show a draggable preview icon. Position is shared by all characters of this class.")
-    unlockRow:SetParentInitializer(enabledRow)
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Buffs for " .. (select(1, UnitClass("player")) or "your class")))
     layout:AddInitializer(Settings.CreatePanelInitializer("LHBuffRemindersBuffListTemplate", {name = "Monitored buffs"}))
 end

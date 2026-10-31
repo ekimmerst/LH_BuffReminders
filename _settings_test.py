@@ -99,8 +99,12 @@ lua.execute('local Hub=LH_Tweaks\nfunction Hub:RegisterModulePage(id)' + registr
 lua.execute((root / 'LH_BuffReminders/Settings.lua').read_text(encoding='utf-8'), 'LH_BuffReminders')
 lua.execute('''
 assert(registered.parent==LH_Tweaks.category and registered.title=='LH BuffReminders')
+assert(registered.layout.rows[1].header=='Positioning')
+assert(registered.layout.rows[2].setting==registry.LH_BuffReminders_locked)
+assert(registered.layout.rows[2].parent==nil)
 assert(panelInitializer.template=='LHBuffRemindersBuffListTemplate')
-assert(registry.LH_BuffReminders_enabled.get() and not registry.LH_BuffReminders_unlocked.get())
+assert(registry.LH_BuffReminders_enabled.get() and registry.LH_BuffReminders_locked.get())
+assert(registry.LH_BuffReminders_locked.default==true)
 registry.LH_BuffReminders_enabled.set(false);assert(#TestRemindersVisible()==0)
 registry.LH_BuffReminders_enabled.set(true);assert(#TestRemindersVisible()==1)
 SlashCmdList.LH_BUFFREMINDERS('');assert(opened=='LH BuffReminders')
