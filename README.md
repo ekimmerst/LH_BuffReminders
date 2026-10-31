@@ -45,5 +45,13 @@
 
 <p><strong>LH Tweaks is required</strong> and must be installed alongside LH BuffReminders. I made this for the buffs I kept forgetting myself. If a class buff does not behave as expected, or you have an idea to improve the reminders, please tell me in the CurseForge comments.</p>
 
+<h2 style="color: #73c9c4;">Changelog</h2>
+
+<p><strong>1.2.1 - Forever</strong></p>
+
+<ul>
+  <li>Newly shown missing-buff icons briefly grow and shrink to draw attention.</li>
+</ul>
+
 <hr>
-<p><sup>*</sup> Implemented with the help of Codex and GPT-6-SOL and tested by me as thoroughly as I could in the WoW beta client. Not every class and race ability may be covered yet; please report anything you notice.</p>
+<p><sup>*</sup> Implemented with the help of Codex and GPT-6-SOL. Not every class and race ability may be covered yet; please report anything you notice.</p>
