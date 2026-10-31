@@ -6,7 +6,7 @@
 ## IconTexture: Interface\AddOns\LH_BuffReminders\Media\Icon
 ## Notes: Reminds you of missing class buffs.
 ## Author: LH_BuffReminders
-## Version: 1.2.0
+## Version: 1.2.1
 ## SavedVariables: LH_BuffRemindersClassDB
 ## SavedVariablesPerCharacter: LH_BuffRemindersDB
 

@@ -462,6 +462,46 @@ local function SavePosition()
     end
 end
 
+local PULSE_TIME, PULSE_PERIOD = 3, 1
+
+-- Grows and shrinks the icon of a newly shown reminder once per period so it catches
+-- the eye. Only the texture changes, which stays allowed on secure buttons during combat.
+local GLOW_SIZE = 64
+
+-- grow is the extra distance per side; the glow border scales by the same ratio.
+local function SetIconGrowth(button, grow)
+    local icon = button.icon
+    local iconSize = SIZE + 2 * grow
+    icon:ClearAllPoints()
+    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+    icon:SetSize(iconSize, iconSize)
+    local glowSize = GLOW_SIZE * iconSize / SIZE
+    button.glow:SetSize(glowSize, glowSize)
+end
+
+local function PulseStop(self)
+    self:SetScript("OnUpdate", nil)
+    SetIconGrowth(self, 0)
+end
+
+local function PulseUpdate(self)
+    local elapsed = GetTime() - self.pulseStart
+    if elapsed >= PULSE_TIME then return PulseStop(self) end
+    local wave = (1 - math.cos(elapsed / PULSE_PERIOD * 2 * math.pi)) / 2
+    SetIconGrowth(self, SIZE * 0.1 * wave)
+end
+
+local function SetReminderShown(button, show)
+    local wasShown = button:GetAlpha() > 0
+    button:SetAlpha(show and 1 or 0)
+    if show and not wasShown and button.example ~= true then
+        button.pulseStart = GetTime()
+        button:SetScript("OnUpdate", PulseUpdate)
+    elseif not show and button:GetScript("OnUpdate") then
+        PulseStop(button)
+    end
+end
+
 local function GetButton(index)
     if buttons[index] then return buttons[index] end
     local button = CreateFrame("Button", nil, anchor, "SecureActionButtonTemplate")
@@ -469,13 +509,14 @@ local function GetButton(index)
     button:RegisterForClicks("AnyUp", "AnyDown")
     button:SetAttribute("unit", "player")
     button.icon = button:CreateTexture(nil, "ARTWORK")
-    button.icon:SetAllPoints()
+    button.icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.icon:SetSize(SIZE, SIZE)
     button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     button.glow = button:CreateTexture(nil, "OVERLAY")
     button.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
     button.glow:SetBlendMode("ADD")
     button.glow:SetVertexColor(1, 0.8, 0.15, 1)
-    button.glow:SetSize(64, 64)
+    button.glow:SetSize(GLOW_SIZE, GLOW_SIZE)
     button.glow:SetPoint("CENTER")
     button:RegisterForDrag("LeftButton")
     button:SetScript("OnDragStart", function()
@@ -656,7 +697,7 @@ local function CombatRefresh()
                 end
             end
         end
-        button:SetAlpha(show and 1 or 0)
+        SetReminderShown(button, show)
     end
 end
 
@@ -690,7 +731,11 @@ Refresh = function()
     for _, group in ipairs(standby) do slots[#slots + 1] = group end
     -- Hiding a dragged button interrupts WoW's drag capture. Keep visible
     -- buttons alive and only change their anchors when the layout changes.
-    for i = #slots + 1, #buttons do buttons[i]:Hide(); buttons[i].group = false end
+    for i = #slots + 1, #buttons do
+        SetReminderShown(buttons[i], false)
+        buttons[i]:Hide()
+        buttons[i].group = false
+    end
     for i, group in ipairs(slots) do
         local button = GetButton(i)
         local action = not group.example and group.id or nil
@@ -709,8 +754,8 @@ Refresh = function()
             button:SetPoint("CENTER", anchor, "CENTER", offset, 0)
             button.offset = offset
         end
-        button:SetAlpha(i <= #missing and 1 or 0)
         button:Show()
+        SetReminderShown(button, i <= #missing)
     end
 end
 

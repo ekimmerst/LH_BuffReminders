@@ -35,6 +35,7 @@ SlashCmdList={}
 local class, enchanted, shield, dead, weapon='SHAMAN',false,false,false,true
 local combat=false
 function InCombatLockdown() return combat end
+function GetTime() return 0 end
 function UnitClass() return 'Shaman',class end
 function GetSpellInfo(id)
  if id==8017 then return 'Rockbiter Weapon',nil,'Icon'..id end

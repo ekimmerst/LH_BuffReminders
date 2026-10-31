@@ -170,6 +170,17 @@ UnitBuff=function(_,index) if index==1 then return 'Aspect of the Hawk' end end
 now=211;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==0)
 UnitBuff=function() end
 now=212;TestRemindersEvent('UNIT_AURA','player');assert(#TestRemindersVisible()==1)
+TestRemindersCombat(false)
+TestRemindersEvent('PLAYER_REGEN_ENABLED')
+LH_BuffReminders:SetEnabled(false)
+LH_BuffReminders:SetEnabled(true)
+local pulseButton=TestRemindersVisible()[1]
+assert(pulseButton.pulseStart==now and pulseButton.scripts.OnUpdate)
+now=212.25;pulseButton.scripts.OnUpdate(pulseButton)
+assert(pulseButton.icon.width>pulseButton.width,'New reminder icon did not grow')
+now=215.5;pulseButton.scripts.OnUpdate(pulseButton)
+assert(pulseButton.icon.width==pulseButton.width and not pulseButton.scripts.OnUpdate,
+    'Reminder pulse did not stop and restore its size')
 TestRemindersCombat(false);TestRemindersEvent('PLAYER_REGEN_ENABLED')
 -- Buff present before combat but unreadable in combat.
 UnitBuff=function(_,index) if index==1 then return 'Aspect of the Hawk' end end
