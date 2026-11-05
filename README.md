@@ -9,6 +9,7 @@
 <ul>
   <li>Add a learned buff by its name or spell ID.</li>
   <li>Choose separately whether to watch for it in combat or out of combat.</li>
+  <li>For a missing buff whose cast spell has a cooldown, show its reminder only when that spell is ready again. An available charge also counts as ready.</li>
   <li>Unlock a draggable preview to place the reminder where it suits your UI.</li>
 </ul>
 
@@ -50,6 +51,12 @@
 <p><strong>LH Tweaks is required</strong> and must be installed alongside LH BuffReminders. I made this for the buffs I kept forgetting myself. If a class buff does not behave as expected, or you have an idea to improve the reminders, please tell me in the CurseForge comments.</p>
 
 <h2 style="color: #73c9c4;">Changelog</h2>
+
+<p><strong>1.3.1 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Wait until the triggering spell's cooldown has finished before showing a missing-buff reminder. Available charges remain usable.</li>
+</ul>
 
 <p><strong>1.3.0 - Forever and Retail</strong></p>
 

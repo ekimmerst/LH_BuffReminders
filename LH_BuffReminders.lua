@@ -680,6 +680,67 @@ local function IsActive(group)
     return HasBuff(group)
 end
 
+-- Check the cast spell rather than the aura: some short buffs can end while
+-- their triggering spell (for example Elune's Light) is still cooling down.
+local function CooldownActive(group)
+    local id = group.id
+    if type(id) ~= "number" then return false end
+    -- Cooldown APIs can still report the old ready state in the cast event.
+    if group.castAt and GetTime() - group.castAt < 0.5 then return true end
+    local charges = C_Spell and C_Spell.GetSpellCharges
+    if charges then
+        local ok, info = pcall(charges, id)
+        if ok and Public(info) and type(info) == "table"
+            and not (issecrettable and issecrettable(info))
+            and Public(info.currentCharges) and type(info.currentCharges) == "number"
+            and info.currentCharges > 0 then
+            group.cooldownBlocked = false
+            return false
+        end
+    end
+    local modern = C_Spell and C_Spell.GetSpellCooldown
+    local legacy = not modern and GetSpellCooldown
+    if modern or legacy then
+        local ok, info, duration, enabled, rate = pcall(modern or legacy, id)
+        if ok then
+            local start
+            if modern and Public(info) and type(info) == "table"
+                and not (issecrettable and issecrettable(info)) then
+                start, duration, enabled, rate = info.startTime, info.duration, info.isEnabled, info.modRate
+            elseif legacy then start = info end
+            if Public(enabled) and (enabled == false or enabled == 0) then
+                group.cooldownBlocked = true
+                return true
+            end
+            if Public(start) and Public(duration) and type(start) == "number"
+                and type(duration) == "number" then
+                local speed = Public(rate) and type(rate) == "number" and rate > 0 and rate or 1
+                local cooling = start > 0 and duration > 0 and start + duration / speed > GetTime() + 0.05
+                group.cooldownBlocked = cooling
+                return cooling
+            end
+        end
+    end
+    -- Modern clients can expose an opaque duration even when numeric cooldown
+    -- fields are restricted in combat.
+    local durationQuery = C_Spell and C_Spell.GetSpellCooldownDuration
+    if durationQuery then
+        local ok, object = pcall(durationQuery, id, false)
+        if ok and Public(object) and object then
+            local okMethod, method = pcall(function() return object.GetRemainingDuration end)
+            if okMethod and type(method) == "function" then
+                local okRemaining, remaining = pcall(method, object)
+                if okRemaining and Public(remaining) and type(remaining) == "number" then
+                    local cooling = remaining > 0.05
+                    group.cooldownBlocked = cooling
+                    return cooling
+                end
+            end
+        end
+    end
+    return group.cooldownBlocked == true
+end
+
 -- Secure buttons cannot be shown, hidden or moved during combat, but their
 -- alpha can change. Out of combat every watched buff keeps a button (invisible
 -- while its buff is present), so a buff lost mid-fight can reappear at once.
@@ -710,6 +771,7 @@ local function CombatRefresh()
                     end
                     show = not active
                 end
+                if show and CooldownActive(group) then show = false end
             end
         end
         SetReminderShown(button, show)
@@ -733,7 +795,7 @@ Refresh = function()
                 local active = IsActive(group)
                 -- Remembered for combat, when the aura list can omit buffs that are present.
                 group.carried = active and true or nil
-                if Watched(group, fight) and not active then
+                if Watched(group, fight) and not active and not CooldownActive(group) then
                     missing[#missing + 1] = group
                 elseif Watched(group, true) then
                     standby[#standby + 1] = group
@@ -980,6 +1042,7 @@ anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
                 local now = GetTime()
                 Log("CAST " .. tostring(group.name) .. " pending=" .. #pendingAdds)
                 group.castAt, group.auraSeen, group.expires, group.removed = now, nil, nil, nil
+                group.cooldownBlocked = true
                 for i = #pendingAdds, 1, -1 do
                     local pending = pendingAdds[i]
                     if now - pending.at < ATTRIBUTION_WINDOW then
@@ -995,7 +1058,7 @@ anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
     end
     Refresh()
 end)
-for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED", "UNIT_AURA", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ALIVE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_INVENTORY_CHANGED" }) do
+for _, event in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED", "SPELL_UPDATE_COOLDOWN", "UNIT_AURA", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ALIVE", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_INVENTORY_CHANGED" }) do
     anchor:RegisterEvent(event)
 end
 -- Temporary weapon enchantments can expire without UNIT_AURA firing.
