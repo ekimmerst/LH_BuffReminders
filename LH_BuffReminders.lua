@@ -90,28 +90,43 @@ end
 local function ClassConfig()
     local class = CurrentClass()
     if not class then return end
-    LH_BuffRemindersClassDB = type(LH_BuffRemindersClassDB) == "table" and LH_BuffRemindersClassDB or {}
-    local value = LH_BuffRemindersClassDB[class]
+    LH_BuffRemindersDB = type(LH_BuffRemindersDB) == "table" and LH_BuffRemindersDB or {}
+    local value = LH_BuffRemindersDB.config
     if type(value) ~= "table" then
-        local legacy = type(LH_BuffRemindersDB) == "table" and LH_BuffRemindersDB or {}
+        local classDB = type(LH_BuffRemindersClassDB) == "table" and LH_BuffRemindersClassDB[class]
+        local legacy = type(classDB) == "table" and classDB or LH_BuffRemindersDB
         local exceptions = {}
         if type(legacy.exceptions) == "table" then
             for name, excluded in pairs(legacy.exceptions) do
                 if excluded then exceptions[name] = true end
             end
         end
+        local monitored = {}
+        if type(legacy.monitored) == "table" then
+            for _, entry in ipairs(legacy.monitored) do
+                if type(entry) == "table" then
+                    local copy = {}
+                    for key, item in pairs(entry) do copy[key] = item end
+                    monitored[#monitored + 1] = copy
+                end
+            end
+        elseif class == "SHAMAN" then
+            monitored = {{kind = "weapon"}, {kind = "shield"}}
+        end
         value = {
-            enabled = true, locked = true,
+            enabled = legacy.enabled ~= false, locked = legacy.locked ~= false,
             x = tonumber(legacy.x) or 0, y = tonumber(legacy.y) or -120,
             exceptions = exceptions,
-            monitored = class == "SHAMAN" and {{kind = "weapon"}, {kind = "shield"}} or {},
+            monitored = monitored,
         }
-        LH_BuffRemindersClassDB[class] = value
+        LH_BuffRemindersDB.config = value
     end
     if type(value.monitored) ~= "table" then value.monitored = {} end
     if type(value.exceptions) ~= "table" then value.exceptions = {} end
     if type(value.enabled) ~= "boolean" then value.enabled = true end
     if type(value.locked) ~= "boolean" then value.locked = true end
+    -- The monitored buffs and exceptions belong to this class, not the source.
+    LH_LayoutProfiles:Register(addonName, value, LH_BuffRemindersDB, {"x", "y", "locked"})
     return value
 end
 

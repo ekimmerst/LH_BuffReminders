@@ -12,11 +12,15 @@
   <li>Unlock a draggable preview to place the reminder where it suits your UI.</li>
 </ul>
 
-<p>Your monitored buffs and layout are shared by characters of the same class, so you only need to set them up once per class.</p>
+<p>Monitored buffs and exclusions are saved per character. Existing class-wide choices are copied to each character the first time it loads this version. Position and lock state can follow another character through the settings profile; activation remains per character.</p>
 
 <h2 style="color: #c78be6;">Settings</h2>
 
 <p>Open <strong>Options → AddOns → LH Tweaks → LH BuffReminders</strong> to enable reminders, add or remove buffs and set when each one should be watched. The list accepts learned buff names or IDs.</p>
+
+<h2 style="color: #c78be6;">Settings profiles</h2>
+
+<p>Choose a character under <strong>Use settings from</strong> to share reminder position and lock state, or apply the source chosen in LH Tweaks to all LH addons. Enabled state, monitored buffs, combat watch choices and exclusions remain individual. <strong>This character</strong> restores your own position and lock state.</p>
 
 <h2 style="color: #73c9c4;">More LH addons</h2>
 
@@ -46,6 +50,13 @@
 <p><strong>LH Tweaks is required</strong> and must be installed alongside LH BuffReminders. I made this for the buffs I kept forgetting myself. If a class buff does not behave as expected, or you have an idea to improve the reminders, please tell me in the CurseForge comments.</p>
 
 <h2 style="color: #73c9c4;">Changelog</h2>
+
+<p><strong>1.3.0 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Added a character settings source for reminder position and lock state.</li>
+  <li>Monitored buffs, watch choices and exclusions are now saved per character. Existing class settings are copied on first load.</li>
+</ul>
 
 <p><strong>1.2.1 - Forever</strong></p>
 

@@ -26,7 +26,7 @@ function LHBuffRemindersBuffListMixin:OnLoad()
     Addon.listPanels[#Addon.listPanels + 1] = self
     local note = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 8, -4)
-    note:SetText("Enter a learned buff name or ID. Shared by your class.")
+    note:SetText("Enter a learned buff name or ID. Saved for this character.")
     note:SetWidth(430)
     note:SetJustifyH("LEFT")
 
@@ -134,20 +134,21 @@ function LHBuffRemindersBuffListMixin:RefreshList()
 end
 
 local function Build(category, layout)
+    LH_LayoutProfiles:AddSetting(category, layout, addonName)
     Addon.category = category
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Positioning"))
     local locked = Proxy(category, "locked", "Lock reminder icon", true,
         function() local db = Addon:GetConfig(); return not db or db.locked ~= false end,
         function(value) SlashCmdList.LH_BUFFREMINDERS(value and "lock" or "unlock") end)
     Settings.CreateCheckbox(category, locked,
-        "Disable to show and drag the preview icon. Position is shared by all characters of this class.")
+        "Disable to show and drag the preview icon. Position and lock state can follow a settings source.")
 
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Reminders"))
     local enabled = Proxy(category, "enabled", "Enable reminders", true,
         function() local db = Addon:GetConfig(); return db and db.enabled end,
         function(value) Addon:SetEnabled(value) end)
     Settings.CreateCheckbox(category, enabled,
-        "Show reminders for missing selected buffs. Saved for all characters of this class.")
+        "Show reminders for missing selected buffs. This switch is saved for this character.")
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Buffs for " .. (select(1, UnitClass("player")) or "your class")))
     layout:AddInitializer(Settings.CreatePanelInitializer("LHBuffRemindersBuffListTemplate", {name = "Monitored buffs"}))
 end
