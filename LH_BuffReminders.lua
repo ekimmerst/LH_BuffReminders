@@ -839,7 +839,7 @@ end
 
 Refresh = function()
     if not initialized then return end
-    if InCombat() then return CombatRefresh() end
+    if Fighting() then return CombatRefresh() end
     local missing = {}
     if not config.enabled then
         -- No preview remains visible while disabled.

@@ -59,6 +59,15 @@ assert lua.eval("#shown") == 2
 assert tuple(lua.eval(f"shown[{i}].name") for i in (1, 2)) == ("Read Leyline", "Enrage")
 
 lua = LuaRuntime(unpack_returned_tuples=True)
+lua.execute("""initialized = true; calls = 0
+function InCombat() return false end
+function Fighting() return true end
+function CombatRefresh() calls = calls + 1 end""")
+lua.execute(section("Refresh = function()", "-- Diagnostic reports open"))
+lua.eval("Refresh()")
+assert lua.eval("calls") == 1, "The combat event must select CombatRefresh before lockdown starts"
+
+lua = LuaRuntime(unpack_returned_tuples=True)
 lua.execute("""C_Secrets = {ShouldAurasBeSecret = function() return true end}
 C_UnitAuras = {GetUnitAuras = function() return {} end}
 function Public() return true end
