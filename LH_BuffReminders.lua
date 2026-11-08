@@ -4,6 +4,7 @@ LH_BuffReminders = Addon
 local SIZE, GAP = 36, 8
 local unlocked, initialized = false, false
 local buttons, groups = {}, {}
+local groupsDirty = false
 local weaponTooltip
 local config
 local Refresh
@@ -805,6 +806,12 @@ end
 local function CombatRefresh()
     local dead = UnitIsDeadOrGhost("player")
     local missing = {}
+    local wasVisible = {}
+    for _, button in ipairs(buttons) do
+        if button.group and button:IsShown() and button:GetAlpha() > 0 then
+            wasVisible[button.group] = true
+        end
+    end
     if not config.enabled then return LayoutReminders(missing) end
     if unlocked then
         missing[1] = { id = 8017, icon = select(2, SpellInfo(8017)), example = true }
@@ -830,7 +837,9 @@ local function CombatRefresh()
                 show = group.removed == true or present == false or active == false
                     or group.precombatMissing == true
             end
-            if show and (not SpellUsable(group) or CooldownActive(group)) then show = false end
+            -- Keep an already visible missing-buff reminder through a temporary
+            -- form restriction. A newly missing buff still needs a usable spell.
+            if show and ((not wasVisible[group] and not SpellUsable(group)) or CooldownActive(group)) then show = false end
         end
         if show then missing[#missing + 1] = group end
     end
@@ -1060,6 +1069,10 @@ anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
         fighting = true
     elseif event == "PLAYER_REGEN_ENABLED" then
         fighting = false
+        if groupsDirty then
+            groupsDirty = false
+            BuildGroups()
+        end
     elseif event == "UNIT_AURA" and unit ~= "player" then
         return
     elseif event == "UNIT_AURA" then
@@ -1091,7 +1104,7 @@ anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
             end
         end
     elseif event == "SPELLS_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
-        BuildGroups()
+        if Fighting() then groupsDirty = true else BuildGroups() end
     end
     Refresh()
 end)

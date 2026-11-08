@@ -39,6 +39,7 @@ assert tuple(lua.eval(f"buttons[{i}].offset") for i in (1, 2, 3)) == (-44, 0, 44
 
 lua = LuaRuntime(unpack_returned_tuples=True)
 lua.execute("""config = {enabled = true, exceptions = {}}; unlocked = false
+buttons = {}
 groups = {{name = 'Mark of the Wild', id = 1},
           {name = 'Read Leyline', id = 2, precombatMissing = true},
           {name = 'Enrage', id = 3, precombatMissing = true}}
@@ -77,5 +78,38 @@ aura_code = section("local function AuraRestricted(group)",
 aura_code += section("local function HasBuff(group)", "local function WeaponTooltipHasBuff(group, slot)")
 has_buff = lua.execute(aura_code + "\nreturn HasBuff")
 assert has_buff(lua.eval("{id=1, names={}, ids={}}")) is None
+
+lua = LuaRuntime(unpack_returned_tuples=True)
+lua.execute("""config = {enabled=true, exceptions={}}; unlocked=false
+local leyline = {name='Read Leyline', id=1259705, precombatMissing=true}
+groups = {leyline}; buttons = {}; usable = true
+function UnitIsDeadOrGhost() return false end
+function Watched() return true end
+function BuffName(s) return s end
+function AuraRestricted() return true end
+function IsActive() return nil end
+function AuraPresent() return nil end
+function GetTime() return 100 end
+function SpellUsable() return usable end
+function CooldownActive() return false end
+function LayoutReminders(missing)
+    shown = missing; buttons = {}
+    for _, group in ipairs(missing) do
+        local button = {group=group}
+        function button:IsShown() return true end
+        function button:GetAlpha() return 1 end
+        buttons[#buttons+1] = button
+    end
+end""")
+combat = lua.execute(section("local function CombatRefresh()", "Refresh = function()")
+                     + "\nreturn CombatRefresh")
+combat()
+assert lua.eval("#shown") == 1
+lua.execute("usable = false")
+combat()
+assert lua.eval("#shown") == 1, "Bear Form hid an already visible Read Leyline reminder"
+lua.execute("groups[1].precombatMissing = nil")
+combat()
+assert lua.eval("#shown") == 0, "Unknown aura state created a reminder"
 
 print("Combat aura and centering scenarios OK")

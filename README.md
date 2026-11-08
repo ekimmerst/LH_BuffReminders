@@ -10,14 +10,14 @@
   <li>Add a learned buff by its name or spell ID.</li>
   <li>Choose separately whether to watch for it in combat or out of combat.</li>
   <li>For a missing buff whose cast spell has a cooldown, show its reminder only when that spell is ready again. An available charge also counts as ready.</li>
-  <li>Show a reminder only while its spell is usable, including its form and resource requirements.</li>
+  <li>Show new reminders only while their spells are usable. A missing-buff reminder already visible in combat stays visible through a temporary form restriction.</li>
   <li>Reminder icons are display-only and stay centered together, even when their number changes during combat.</li>
   <li>Unlock a draggable preview to place the reminder where it suits your UI.</li>
 </ul>
 
 <p>Monitored buffs and exclusions are saved per character. Existing class-wide choices are copied to each character the first time it loads this version. Position and lock state can follow another character through the settings profile; activation remains per character.</p>
 
-<p>In combat, WoW may keep aura details secret. A buff already known to be missing before combat can still trigger a reminder when its spell is usable. If a buff disappears during combat while its aura is hidden, the addon may be unable to detect the loss. An unknown aura state is not treated as a missing buff, and cooldown readiness alone does not prove that the buff is gone.</p>
+<p>In combat, WoW may keep aura details secret. A buff already known to be missing before combat can still trigger a reminder when its spell is usable. Once visible, that reminder stays visible through a temporary form restriction. If a buff disappears during combat while its aura is hidden, the addon may be unable to detect the loss. An unknown aura state is not treated as a missing buff, and cooldown readiness alone does not prove that the buff is gone.</p>
 
 <h2 style="color: #c78be6;">Settings</h2>
 
