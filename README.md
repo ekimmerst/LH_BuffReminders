@@ -10,10 +10,14 @@
   <li>Add a learned buff by its name or spell ID.</li>
   <li>Choose separately whether to watch for it in combat or out of combat.</li>
   <li>For a missing buff whose cast spell has a cooldown, show its reminder only when that spell is ready again. An available charge also counts as ready.</li>
+  <li>Show a reminder only while its spell is usable, including its form and resource requirements.</li>
+  <li>Reminder icons are display-only and stay centered together, even when their number changes during combat.</li>
   <li>Unlock a draggable preview to place the reminder where it suits your UI.</li>
 </ul>
 
 <p>Monitored buffs and exclusions are saved per character. Existing class-wide choices are copied to each character the first time it loads this version. Position and lock state can follow another character through the settings profile; activation remains per character.</p>
+
+<p>In combat, WoW may keep aura details secret. A buff already known to be missing before combat can still trigger a reminder when its spell is usable. If a buff disappears during combat while its aura is hidden, the addon may be unable to detect the loss. An unknown aura state is not treated as a missing buff, and cooldown readiness alone does not prove that the buff is gone.</p>
 
 <h2 style="color: #c78be6;">Settings</h2>
 
@@ -51,6 +55,27 @@
 <p><strong>LH Tweaks is required</strong> and must be installed alongside LH BuffReminders. I made this for the buffs I kept forgetting myself. If a class buff does not behave as expected, or you have an idea to improve the reminders, please tell me in the CurseForge comments.</p>
 
 <h2 style="color: #73c9c4;">Changelog</h2>
+
+<p><strong>1.3.4 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Prevent false missing-buff alerts for active auras whose state is hidden in combat, including Mark of the Wild.</li>
+  <li>Center the combat layout using only buffs with a known missing state.</li>
+</ul>
+
+<p><strong>1.3.3 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Keep all visible reminder icons adjacent and centered as buffs, forms and cooldowns change during combat.</li>
+  <li>Remove spell casting by clicking reminder icons. The position preview can still be dragged while unlocked.</li>
+</ul>
+
+<p><strong>1.3.2 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Hide reminders while their spells are unusable, for example Enrage outside Bear Form.</li>
+  <li>Use the readable cooldown activity flag when cooldown times are hidden in combat.</li>
+</ul>
 
 <p><strong>1.3.1 - Forever and Retail</strong></p>
 

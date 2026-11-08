@@ -10,7 +10,7 @@ local Refresh
 local function InCombat()
     return InCombatLockdown and InCombatLockdown()
 end
--- Tracks the combat state from events too; secure frames are only locked by InCombat().
+-- Track the combat state from events as well as the lockdown API.
 local fighting = false
 local function Fighting() return fighting or InCombat() end
 local anchor = CreateFrame("Frame", "LH_BuffRemindersFrame", UIParent)
@@ -332,6 +332,20 @@ local function Describe(value)
 end
 local function Public(value) return not (issecretvalue and issecretvalue(value)) end
 
+local function AuraRestricted(group)
+    local secrets = C_Secrets
+    if not secrets then return false end
+    if secrets.ShouldAurasBeSecret then
+        local ok, secret = pcall(secrets.ShouldAurasBeSecret)
+        if ok and Public(secret) and secret == true then return true end
+    end
+    if secrets.ShouldSpellAuraBeSecret and group.id then
+        local ok, secret = pcall(secrets.ShouldSpellAuraBeSecret, group.id)
+        if ok and Public(secret) and type(secret) == "boolean" then return secret end
+    end
+    return InCombat()
+end
+
 -- true/false, or nil when combat restrictions hide the aura data.
 local function AuraMatches(group, aura)
     if type(aura) ~= "table" then return false end
@@ -366,6 +380,7 @@ end
 -- Returns true/false, or nil when combat restrictions hide the aura data.
 local function HasBuff(group)
     local unreadable = false
+    local restricted = AuraRestricted(group)
     local function Matches(aura)
         local result = AuraMatches(group, aura)
         if result == nil then unreadable = true; return false end
@@ -388,7 +403,7 @@ local function HasBuff(group)
             end)
             if not scanned then unreadable = true
             elseif found then return true
-            elseif nonempty and not unreadable then return false end
+            elseif nonempty and not unreadable and not restricted then return false end
         else
             unreadable = true
         end
@@ -423,7 +438,7 @@ local function HasBuff(group)
         if not Public(name) then unreadable = true
         elseif group.names[BuffName(name)] then return true end
     end
-    if unreadable then return nil end
+    if unreadable or restricted then return nil end
     return false
 end
 
@@ -479,8 +494,7 @@ end
 
 local PULSE_TIME, PULSE_PERIOD = 3, 1
 
--- Grows and shrinks the icon of a newly shown reminder once per period so it catches
--- the eye. Only the texture changes, which stays allowed on secure buttons during combat.
+-- Grows and shrinks the icon of a newly shown reminder once per period.
 local GLOW_SIZE = 64
 
 -- grow is the extra distance per side; the glow border scales by the same ratio.
@@ -519,10 +533,8 @@ end
 
 local function GetButton(index)
     if buttons[index] then return buttons[index] end
-    local button = CreateFrame("Button", nil, anchor, "SecureActionButtonTemplate")
+    local button = CreateFrame("Frame", nil, anchor)
     button:SetSize(SIZE, SIZE)
-    button:RegisterForClicks("AnyUp", "AnyDown")
-    button:SetAttribute("unit", "player")
     button.icon = button:CreateTexture(nil, "ARTWORK")
     button.icon:SetPoint("CENTER", button, "CENTER", 0, 0)
     button.icon:SetSize(SIZE, SIZE)
@@ -551,6 +563,7 @@ local function GetButton(index)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    button:SetMouseClickEnabled(false)
     buttons[index] = button
     return button
 end
@@ -637,6 +650,7 @@ end
 -- during combat (per buff name), because combat restrictions may hide the aura instead.
 local probeProven = {}
 local function AuraPresent(group)
+    if AuraRestricted(group) then return nil end
     local instance, spell
     local byInstance = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
     if group.auraID and byInstance then
@@ -719,6 +733,14 @@ local function CooldownActive(group)
                 group.cooldownBlocked = cooling
                 return cooling
             end
+            -- Since 12.0.1 this flag remains readable when cooldown times are
+            -- secret. In particular, it clears a stale blocked state on expiry.
+            if modern and Public(info) and type(info) == "table"
+                and not (issecrettable and issecrettable(info))
+                and Public(info.isActive) and type(info.isActive) == "boolean" then
+                group.cooldownBlocked = info.isActive
+                return info.isActive
+            end
         end
     end
     -- Modern clients can expose an opaque duration even when numeric cooldown
@@ -741,49 +763,86 @@ local function CooldownActive(group)
     return group.cooldownBlocked == true
 end
 
--- Secure buttons cannot be shown, hidden or moved during combat, but their
--- alpha can change. Out of combat every watched buff keeps a button (invisible
--- while its buff is present), so a buff lost mid-fight can reappear at once.
+-- Spell usability includes form/stance, resources and other cast requirements.
+-- A secret or unavailable answer cannot establish that the reminder is usable.
+local function SpellUsable(group)
+    local query = C_Spell and C_Spell.IsSpellUsable or IsUsableSpell
+    if not query or type(group.id) ~= "number" then return false end
+    local ok, usable = pcall(query, group.id)
+    return ok and Public(usable) and (usable == true or usable == 1)
+end
+
+-- These are display-only frames, so the visible reminders can be packed and
+-- centered again whenever their number changes, including during combat.
+local function LayoutReminders(missing)
+    for i = #missing + 1, #buttons do
+        SetReminderShown(buttons[i], false)
+        buttons[i]:Hide()
+        buttons[i].group = nil
+    end
+    for i, group in ipairs(missing) do
+        local button = GetButton(i)
+        if button.group ~= group then button:SetAlpha(0) end
+        button.group = group
+        button.spellID, button.example = group.id, group.example
+        button.icon:SetTexture(group.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        local offset = (i - (#missing + 1) / 2) * (SIZE + GAP)
+        if button.offset ~= offset then
+            button:ClearAllPoints()
+            button:SetPoint("CENTER", anchor, "CENTER", offset, 0)
+            button.offset = offset
+        end
+        local draggable = unlocked and not InCombat()
+        if button.draggable ~= draggable then
+            button:SetMouseClickEnabled(draggable)
+            button.draggable = draggable
+        end
+        button:Show()
+        SetReminderShown(button, true)
+    end
+end
+
 local function CombatRefresh()
     local dead = UnitIsDeadOrGhost("player")
-    for _, button in ipairs(buttons) do
-        local group = button.group
-        local show = false
-        if group and config.enabled then
-            if group.example then show = true
-            elseif not unlocked and not dead and Watched(group, true)
-                and not config.exceptions[BuffName(group.name)] then
-                if group.expires and GetTime() > group.expires + 0.5 then RemovedAura(group) end
-                if group.removed then
-                    show = true
-                else
-                    local ok, active = pcall(IsActive, group)
-                    if not ok then active = nil end
-                    local recent = group.castAt and GetTime() - group.castAt < CAST_GRACE
-                    local okPresent, present = pcall(AuraPresent, group)
-                    if not okPresent then present = nil end
-                    if present == false then active = recent and true or false
-                    elseif active then group.auraSeen = true
-                    elseif present == true then active = true
-                    elseif active == false then active = recent and true or false
-                    elseif group.castAt or group.carried then
-                        active = true
-                    end
-                    show = not active
-                end
-                if show and CooldownActive(group) then show = false end
-            end
-        end
-        SetReminderShown(button, show)
+    local missing = {}
+    if not config.enabled then return LayoutReminders(missing) end
+    if unlocked then
+        missing[1] = { id = 8017, icon = select(2, SpellInfo(8017)), example = true }
+        return LayoutReminders(missing)
     end
+    for _, group in ipairs(groups) do
+        local show = false
+        if not dead and Watched(group, true)
+            and not config.exceptions[BuffName(group.name)] then
+            local restricted = AuraRestricted(group)
+            -- A public expiry can become stale after a refresh whose aura data
+            -- is secret. Only use it when the aura remains readable.
+            if not restricted and group.expires and GetTime() > group.expires + 0.5 then RemovedAura(group) end
+            local ok, active = pcall(IsActive, group)
+            if not ok then active = nil end
+            local okPresent, present = pcall(AuraPresent, group)
+            if not okPresent then present = nil end
+            local recent = group.castAt and GetTime() - group.castAt < CAST_GRACE
+            if active == true or present == true then
+                group.auraSeen, group.carried, group.removed = true, true, nil
+            elseif not recent then
+                -- Unknown aura state must never become a missing-buff alert.
+                show = group.removed == true or present == false or active == false
+                    or group.precombatMissing == true
+            end
+            if show and (not SpellUsable(group) or CooldownActive(group)) then show = false end
+        end
+        if show then missing[#missing + 1] = group end
+    end
+    LayoutReminders(missing)
 end
 
 Refresh = function()
     if not initialized then return end
     if InCombat() then return CombatRefresh() end
-    local missing, standby = {}, {}
+    local missing = {}
     if not config.enabled then
-        -- No preview or secure action remains visible while disabled.
+        -- No preview remains visible while disabled.
     elseif unlocked then
         missing[1] = { id = 8017, icon = select(2, SpellInfo(8017)), example = true }
     elseif not UnitIsDeadOrGhost("player") then
@@ -795,45 +854,14 @@ Refresh = function()
                 local active = IsActive(group)
                 -- Remembered for combat, when the aura list can omit buffs that are present.
                 group.carried = active and true or nil
-                if Watched(group, fight) and not active and not CooldownActive(group) then
+                group.precombatMissing = active == false
+                if Watched(group, fight) and not active and SpellUsable(group) and not CooldownActive(group) then
                     missing[#missing + 1] = group
-                elseif Watched(group, true) then
-                    standby[#standby + 1] = group
                 end
             end
         end
     end
-    local slots = {}
-    for _, group in ipairs(missing) do slots[#slots + 1] = group end
-    for _, group in ipairs(standby) do slots[#slots + 1] = group end
-    -- Hiding a dragged button interrupts WoW's drag capture. Keep visible
-    -- buttons alive and only change their anchors when the layout changes.
-    for i = #slots + 1, #buttons do
-        SetReminderShown(buttons[i], false)
-        buttons[i]:Hide()
-        buttons[i].group = false
-    end
-    for i, group in ipairs(slots) do
-        local button = GetButton(i)
-        local action = not group.example and group.id or nil
-        if button.action ~= action then
-            button:SetAttribute("type", action and "spell" or nil)
-            -- A localized spell name lets WoW choose the highest learned rank.
-            button:SetAttribute("spell", action and (group.name or group.id) or nil)
-            button.action = action
-        end
-        button.group = group
-        button.spellID, button.example = group.id, group.example
-        button.icon:SetTexture(group.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-        local offset = (i - (#missing + 1) / 2) * (SIZE + GAP)
-        if button.offset ~= offset then
-            button:ClearAllPoints()
-            button:SetPoint("CENTER", anchor, "CENTER", offset, 0)
-            button.offset = offset
-        end
-        button:Show()
-        SetReminderShown(button, i <= #missing)
-    end
+    LayoutReminders(missing)
 end
 
 -- Diagnostic reports open in a selectable text box (Ctrl+A, Ctrl+C) instead of the chat.
@@ -945,6 +973,11 @@ SlashCmdList.LH_BUFFREMINDERS = function(message)
     if command == "debug" then
         Out("LH_BuffReminders: lockdown=" .. tostring(InCombat()) .. " fighting=" .. tostring(fighting)
             .. " enabled=" .. tostring(config and config.enabled))
+        local visible = 0
+        for _, button in ipairs(buttons) do
+            if button:IsShown() and button:GetAlpha() > 0 then visible = visible + 1 end
+        end
+        Out("  visible icons=" .. visible)
         Out("  last UNIT_AURA payload: " .. lastAuraInfo .. " [" .. lastPayloadDetail .. "]"
             .. " | GetPlayerAuraBySpellID=" .. tostring(C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID ~= nil)
             .. " GetAuraDataByAuraInstanceID=" .. tostring(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID ~= nil)
@@ -969,11 +1002,15 @@ SlashCmdList.LH_BUFFREMINDERS = function(message)
                 Out("    aura list: ok=" .. tostring(okL) .. " entries=" .. count)
             end
             for _, button in ipairs(buttons) do
-                if button.group == group then Out("    button alpha=" .. tostring(button:GetAlpha()) .. " shown=" .. tostring(button:IsShown() and true or false)) end
+                if button.group == group then
+                    Out("    button alpha=" .. tostring(button:GetAlpha()) .. " shown="
+                        .. tostring(button:IsShown() and true or false) .. " offset=" .. tostring(button.offset))
+                end
             end
             local ok, active = pcall(IsActive, group)
-            Out(string.format("  %s: active=%s%s auraID=%s expiresIn=%s castAge=%s watched ooc=%s combat=%s",
-                tostring(group.name), tostring(active), ok and "" or " (error)", tostring(group.auraID),
+            Out(string.format("  %s: active=%s%s restricted=%s missingBeforeCombat=%s auraID=%s expiresIn=%s castAge=%s watched ooc=%s combat=%s",
+                tostring(group.name), tostring(active), ok and "" or " (error)",
+                tostring(AuraRestricted(group)), tostring(group.precombatMissing), tostring(group.auraID),
                 group.expires and string.format("%.0f", group.expires - GetTime()) or "-",
                 group.castAt and string.format("%.1f", GetTime() - group.castAt) or "-",
                 tostring(Watched(group, false)), tostring(Watched(group, true))))
@@ -1041,7 +1078,7 @@ anchor:SetScript("OnEvent", function(_, event, unit, extra, spellID)
             if group.ids[spellID] then
                 local now = GetTime()
                 Log("CAST " .. tostring(group.name) .. " pending=" .. #pendingAdds)
-                group.castAt, group.auraSeen, group.expires, group.removed = now, nil, nil, nil
+                group.castAt, group.auraSeen, group.expires, group.removed, group.precombatMissing = now, nil, nil, nil, nil
                 group.cooldownBlocked = true
                 for i = #pendingAdds, 1, -1 do
                     local pending = pendingAdds[i]
