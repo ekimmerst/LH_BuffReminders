@@ -116,6 +116,7 @@ local function ClassConfig()
         end
         value = {
             enabled = legacy.enabled ~= false, locked = legacy.locked ~= false,
+            foodEnabled = legacy.foodEnabled == true,
             x = tonumber(legacy.x) or 0, y = tonumber(legacy.y) or -120,
             exceptions = exceptions,
             monitored = monitored,
@@ -125,6 +126,7 @@ local function ClassConfig()
     if type(value.monitored) ~= "table" then value.monitored = {} end
     if type(value.exceptions) ~= "table" then value.exceptions = {} end
     if type(value.enabled) ~= "boolean" then value.enabled = true end
+    if type(value.foodEnabled) ~= "boolean" then value.foodEnabled = false end
     if type(value.locked) ~= "boolean" then value.locked = true end
     -- The monitored buffs and exceptions belong to this class, not the source.
     LH_LayoutProfiles:Register(addonName, value, LH_BuffRemindersDB, {"x", "y", "locked"})
@@ -242,6 +244,17 @@ local function BuildGroups()
                 end
             end
         end
+    end
+    if config.foodEnabled then
+        -- Different foods use different spell IDs but share the localized aura name.
+        local wellFed = SpellInfo(19705)
+        local names = { ["well fed"] = true }
+        if wellFed then names[BuffName(wellFed)] = true end
+        groups[#groups + 1] = {
+            kind = "food", name = wellFed or "Well Fed",
+            icon = select(2, SpellInfo(2550)) or "Interface\\Icons\\Trade_Cooking",
+            ids = {}, names = names,
+        }
     end
     if Addon.RefreshSettings then Addon:RefreshSettings() end
 end
@@ -558,8 +571,13 @@ local function GetButton(index)
             GameTooltip:SetText("LH_BuffReminders: Position")
             GameTooltip:AddLine("Left-drag to move. /lh_buffreminders lock", 1, 1, 1, true)
         else
-            GameTooltip:SetSpellByID(self.spellID)
-            GameTooltip:AddLine("Missing buff", 1, 0.8, 0.15)
+            if self.group and self.group.kind == "food" then
+                GameTooltip:SetText("Food buff")
+                GameTooltip:AddLine("No Well Fed buff active", 1, 0.8, 0.15)
+            else
+                GameTooltip:SetSpellByID(self.spellID)
+                GameTooltip:AddLine("Missing buff", 1, 0.8, 0.15)
+            end
         end
         GameTooltip:Show()
     end)
@@ -839,7 +857,8 @@ local function CombatRefresh()
             end
             -- Keep an already visible missing-buff reminder through a temporary
             -- form restriction. A newly missing buff still needs a usable spell.
-            if show and ((not wasVisible[group] and not SpellUsable(group)) or CooldownActive(group)) then show = false end
+            if show and group.kind ~= "food"
+                and ((not wasVisible[group] and not SpellUsable(group)) or CooldownActive(group)) then show = false end
         end
         if show then missing[#missing + 1] = group end
     end
@@ -864,7 +883,8 @@ Refresh = function()
                 -- Remembered for combat, when the aura list can omit buffs that are present.
                 group.carried = active and true or nil
                 group.precombatMissing = active == false
-                if Watched(group, fight) and not active and SpellUsable(group) and not CooldownActive(group) then
+                if Watched(group, fight) and active == false
+                    and (group.kind == "food" or (SpellUsable(group) and not CooldownActive(group))) then
                     missing[#missing + 1] = group
                 end
             end
@@ -1054,6 +1074,13 @@ end
 function Addon:SetEnabled(enabled)
     if not config then return end
     config.enabled = not not enabled
+    Refresh()
+end
+
+function Addon:SetFoodEnabled(enabled)
+    if not config then return end
+    config.foodEnabled = not not enabled
+    BuildGroups()
     Refresh()
 end
 

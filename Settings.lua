@@ -149,6 +149,11 @@ local function Build(category, layout)
         function(value) Addon:SetEnabled(value) end)
     Settings.CreateCheckbox(category, enabled,
         "Show reminders for missing selected buffs. This switch is saved for this character.")
+    local food = Proxy(category, "foodEnabled", "Remind me to eat buff food", false,
+        function() local db = Addon:GetConfig(); return db and db.foodEnabled == true end,
+        function(value) Addon:SetFoodEnabled(value) end)
+    Settings.CreateCheckbox(category, food,
+        "Show the Cooking icon when no Well Fed food buff is active. Saved for this character.")
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Buffs for " .. (select(1, UnitClass("player")) or "your class")))
     layout:AddInitializer(Settings.CreatePanelInitializer("LHBuffRemindersBuffListTemplate", {name = "Monitored buffs"}))
 end

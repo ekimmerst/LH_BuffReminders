@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.5 - Forever and Retail
+
+- Add an optional per-character Cooking icon reminder when no Well Fed food buff is active, regardless of which food provided it. Off by default.
+
 ## 1.3.4 - Forever and Retail
 
 - Prevent false missing-buff alerts when an active aura, such as Mark of the Wild, is hidden by combat restrictions.
