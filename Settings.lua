@@ -26,7 +26,7 @@ function LHBuffRemindersBuffListMixin:OnLoad()
     Addon.listPanels[#Addon.listPanels + 1] = self
     local note = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 8, -4)
-    note:SetText("Enter a learned buff name or ID. Saved for this character.")
+    note:SetText("Enter a learned buff name/ID or choose from the list.")
     note:SetWidth(430)
     note:SetJustifyH("LEFT")
 
@@ -45,23 +45,95 @@ function LHBuffRemindersBuffListMixin:OnLoad()
     self.rows = {}
 
     local edit = CreateFrame("EditBox", nil, self, "InputBoxTemplate")
-    edit:SetSize(315, 25)
+    edit:SetSize(267, 25)
     edit:SetPoint("TOPLEFT", scroll, "BOTTOMLEFT", 8, -12)
     edit:SetAutoFocus(false)
     edit:SetMaxLetters(120)
     self.edit = edit
+    local choose = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
+    choose:SetSize(35, 25)
+    choose:SetPoint("LEFT", edit, "RIGHT", 8, 0)
+    choose:SetText("v")
+    self.choose = choose
+    choose:SetScript("OnEnter", function(button)
+        GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Choose a learned class buff.", 1, 1, 1, 1, true)
+    end)
+    choose:SetScript("OnLeave", function() GameTooltip:Hide() end)
     local add = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
     add:SetSize(45, 25)
-    add:SetPoint("LEFT", edit, "RIGHT", 12, 0)
+    add:SetPoint("LEFT", choose, "RIGHT", 8, 0)
     add:SetText("+")
     self.add = add
     self.message = self:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     self.message:SetPoint("TOPLEFT", edit, "BOTTOMLEFT", -3, -7)
     self.message:SetWidth(415)
     self.message:SetJustifyH("LEFT")
+    local choices = CreateFrame("Frame", nil, self, "BackdropTemplate")
+    choices:SetSize(315, 188)
+    choices:SetPoint("BOTTOMLEFT", edit, "TOPLEFT", -4, 3)
+    choices:SetFrameStrata("DIALOG")
+    choices:SetClampedToScreen(true)
+    if choices.SetBackdrop then
+        choices:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = {left = 4, right = 4, top = 4, bottom = 4},
+        })
+        choices:SetBackdropColor(0, 0, 0, 0.95)
+    end
+    local choiceScroll = CreateFrame("ScrollFrame", nil, choices, "UIPanelScrollFrameTemplate")
+    choiceScroll:SetPoint("TOPLEFT", 6, -6)
+    choiceScroll:SetPoint("BOTTOMRIGHT", -26, 6)
+    local choiceContent = CreateFrame("Frame", nil, choiceScroll)
+    choiceContent:SetSize(280, 1)
+    choiceScroll:SetScrollChild(choiceContent)
+    self.choices, self.choiceContent, self.choiceRows = choices, choiceContent, {}
+    choices:Hide()
+
+    choose:SetScript("OnClick", function()
+        if choices:IsShown() then choices:Hide(); return end
+        local available = Addon:GetAvailableBuffs()
+        if #available == 0 then
+            self.message:SetText("No unmonitored learned class buffs are available.")
+            return
+        end
+        self.message:SetText("")
+        for index, option in ipairs(available) do
+            local row = self.choiceRows[index]
+            if not row then
+                row = CreateFrame("Button", nil, choiceContent)
+                row:SetSize(278, 27)
+                row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+                row.icon = row:CreateTexture(nil, "ARTWORK")
+                row.icon:SetSize(20, 20)
+                row.icon:SetPoint("LEFT", 4, 0)
+                row.name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+                row.name:SetPoint("LEFT", row.icon, "RIGHT", 7, 0)
+                row.name:SetWidth(245)
+                row.name:SetJustifyH("LEFT")
+                self.choiceRows[index] = row
+            end
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", choiceContent, "TOPLEFT", 0, -(index - 1) * 27)
+            row.icon:SetTexture(option.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.name:SetText(option.name)
+            row:SetScript("OnClick", function()
+                edit:SetText(option.name)
+                choices:Hide()
+            end)
+            row:Show()
+        end
+        for index = #available + 1, #self.choiceRows do self.choiceRows[index]:Hide() end
+        choiceContent:SetHeight(#available * 27)
+        choices:SetHeight(math.min(188, #available * 27 + 12))
+        choiceScroll:SetVerticalScroll(0)
+        choices:Show()
+    end)
     local function AddBuff()
         local ok, message = Addon:AddBuff(edit:GetText())
-        if ok then edit:SetText(""); edit:ClearFocus(); self.message:SetText("")
+        if ok then edit:SetText(""); edit:ClearFocus(); self.message:SetText(""); choices:Hide()
         else self.message:SetText(message or "Unable to add buff.") end
     end
     add:SetScript("OnClick", AddBuff)
@@ -75,9 +147,11 @@ end
 
 function LHBuffRemindersBuffListMixin:Release()
     if self.edit then self.edit:ClearFocus() end
+    if self.choices then self.choices:Hide() end
 end
 
 function LHBuffRemindersBuffListMixin:OnShow()
+    if self.choices then self.choices:Hide() end
     self:RefreshList()
 end
 

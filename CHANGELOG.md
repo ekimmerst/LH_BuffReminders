@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.7 - Forever and Retail
+
+- Add a dropdown beside the buff entry field with learned, currently available class buffs that are not yet monitored. Suggestions omit unlearned ranks, duplicate buff families, and spells already covered by a shaman weapon or shield reminder.
+- Keep manual name and spell-ID entry for buffs outside the suggested families.
+
+## 1.3.6 - Forever and Retail
+
+- Accept "Rockbiter" on German clients and add learned shaman weapon buffs through the weapon-enchant reminder group.
+
 ## 1.3.5 - Forever and Retail
 
 - Add an optional per-character Cooking icon reminder when no Well Fed food buff is active, regardless of which food provided it. Off by default.

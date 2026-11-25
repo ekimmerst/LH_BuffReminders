@@ -7,7 +7,7 @@
 <h2 style="color: #73c9c4;">Choose your reminders</h2>
 
 <ul>
-  <li>Add a learned buff by its name or spell ID.</li>
+  <li>Add a learned buff by its name or spell ID, or pick an available class buff from the dropdown beside the entry field.</li>
   <li>Choose separately whether to watch for it in combat or out of combat.</li>
   <li>Optionally show a Cooking icon when no Well Fed food buff is active, regardless of which food provided it. This reminder is off by default.</li>
   <li>For a missing buff whose cast spell has a cooldown, show its reminder only when that spell is ready again. An available charge also counts as ready.</li>
@@ -22,7 +22,9 @@
 
 <h2 style="color: #c78be6;">Settings</h2>
 
-<p>Open <strong>Options → AddOns → LH Tweaks → LH BuffReminders</strong> to enable reminders, switch on <strong>Remind me to eat buff food</strong>, add or remove buffs and set when each one should be watched. The food reminder checks the player's Well Fed aura and appears beside the other icons with the Cooking symbol. The list accepts learned buff names or IDs.</p>
+<p>Open <strong>Options → AddOns → LH Tweaks → LH BuffReminders</strong> to enable reminders, switch on <strong>Remind me to eat buff food</strong>, add or remove buffs and set when each one should be watched. The food reminder checks the player's Well Fed aura and appears beside the other icons with the Cooking symbol. The buff field accepts learned names or IDs. Its <strong>v</strong> button offers known class buffs from your spellbook; choose one and click <strong>+</strong>. The dropdown omits unlearned ranks and buffs already monitored. You can still type a server-specific buff that is not suggested.</p>
+
+<p>For shamans, weapon enchantments and shields each form one reminder group. Rockbiter is also accepted on German clients where the spellbook names it Waffe des Felsbeißers. When either group is already monitored, its other spells are not offered again.</p>
 
 <h2 style="color: #c78be6;">Settings profiles</h2>
 
@@ -56,6 +58,18 @@
 <p><strong>LH Tweaks is required</strong> and must be installed alongside LH BuffReminders. I made this for the buffs I kept forgetting myself. If a class buff does not behave as expected, or you have an idea to improve the reminders, please tell me in the CurseForge comments.</p>
 
 <h2 style="color: #73c9c4;">Changelog</h2>
+
+<p><strong>1.3.7 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Add a dropdown of available, unmonitored class buffs next to the buff entry field.</li>
+</ul>
+
+<p><strong>1.3.6 - Forever and Retail</strong></p>
+
+<ul>
+  <li>Accept "Rockbiter" on German clients and add learned shaman weapon buffs through the weapon-enchant reminder group.</li>
+</ul>
 
 <p><strong>1.3.5 - Forever and Retail</strong></p>
 

@@ -64,7 +64,8 @@ end
 
 local function BuffName(name)
     if type(name) ~= "string" then return nil end
-    name = name:lower():match("^%s*(.-)%s*$")
+    -- Normalize ß before lowercasing; some Lua locales corrupt its UTF-8 bytes.
+    name = name:gsub("ß", "ss"):lower():match("^%s*(.-)%s*$")
     -- Forever can include the rank in the aura name (e.g. "Rockbiter 2").
     name = name:gsub("%s*%(%s*rank%s+%d+%s*%)$", "")
         :gsub("%s*%(%s*rang%s+%d+%s*%)$", "")
@@ -73,8 +74,8 @@ local function BuffName(name)
         :gsub("%s+%d+$", "")
     -- The cast and the resulting aura can use different family names.
     local aliases = {
-        ["rockbiter weapon"] = "rockbiter", ["waffe des felsbeißers"] = "felsbeißer",
-        ["waffe des felsbeissers"] = "felsbeißer", ["felsbeisser"] = "felsbeißer",
+        ["rockbiter weapon"] = "rockbiter", ["waffe des felsbeissers"] = "rockbiter",
+        ["felsbeisser"] = "rockbiter",
         ["flametongue weapon"] = "flametongue", ["frostbrand weapon"] = "frostbrand",
         ["windfury weapon"] = "windfury", ["earthliving weapon"] = "earthliving",
         ["blitzschlagschild"] = "lightning shield", ["wasserschild"] = "water shield",
@@ -289,6 +290,78 @@ function Addon:SetWatch(index, mode, value)
     if self.RefreshSettings then self:RefreshSettings() end
 end
 
+local function ShamanKind(id, key)
+    if CurrentClass() ~= "SHAMAN" then return end
+    for _, definition in ipairs(definitions) do
+        for _, candidate in ipairs(definition.ids) do
+            local candidateName = SpellInfo(candidate)
+            if candidate == id or (candidateName and BuffName(candidateName) == key) then
+                return definition.kind
+            end
+        end
+    end
+end
+
+local function IsMonitored(key, kind)
+    for index, entry in ipairs(config.monitored) do
+        if kind and entry.kind == kind then return true end
+        local existing = Addon:GetEntry(index)
+        if existing and BuffName(existing) == key then return true end
+    end
+    return false
+end
+
+local function IsHelpfulBuff(id, kind)
+    if kind then return true end
+    local helpful = IsHelpfulSpell or (C_Spell and C_Spell.IsSpellHelpful)
+    if not helpful then return true end
+    local ok, result = pcall(helpful, id)
+    return not ok or result ~= false
+end
+
+-- These are spell families, not required ranks. The spellbook supplies the
+-- learned rank, so suggestions never offer a spell above the player's level.
+local suggestedBuffs = {
+    WARRIOR = {6673, 469},
+    PALADIN = {19740, 19742, 20217, 1038, 1044, 1022, 6940, 465, 7294,
+        19746, 19876, 19888, 19891, 32223, 25780},
+    HUNTER = {13165, 13163, 5118, 13159, 20043, 34074, 61846, 19506},
+    ROGUE = {1784, 2823, 8679, 3408, 5761},
+    PRIEST = {1243, 21562, 14752, 27681, 976, 27683, 588, 6346},
+    DEATHKNIGHT = {57330, 48263, 48265, 48266},
+    SHAMAN = {546, 131, 2645, 2825, 32182},
+    MAGE = {1459, 23028, 168, 7302, 6117, 30482, 604, 1008, 1463, 11426},
+    WARLOCK = {687, 706, 28176, 5697, 19028, 11743},
+    DRUID = {1126, 21849, 467, 16864, 768, 5487, 9634, 783, 1066,
+        24858, 33943, 40120},
+    MONK = {115921, 116781},
+    EVOKER = {364342, 381748},
+}
+
+function Addon:GetAvailableBuffs()
+    if not config then return {} end
+    local allowed = {}
+    for _, id in ipairs(suggestedBuffs[CurrentClass()] or {}) do
+        local name = SpellInfo(id)
+        if name then allowed[BuffName(name)] = true end
+    end
+    local byKey = {}
+    EachKnownSpell(function(id)
+        local name, icon = SpellInfo(id)
+        if name then
+            local key = BuffName(name)
+            local kind = ShamanKind(id, key)
+            if (allowed[key] or kind) and IsHelpfulBuff(id, kind) and not IsMonitored(key, kind) then
+                byKey[kind or key] = {id = id, name = name, icon = icon}
+            end
+        end
+    end)
+    local available = {}
+    for _, option in pairs(byKey) do available[#available + 1] = option end
+    table.sort(available, function(a, b) return a.name < b.name end)
+    return available
+end
+
 function Addon:AddBuff(text)
     if not config then return false, "Settings are not ready." end
     text = type(text) == "string" and text:match("^%s*(.-)%s*$") or ""
@@ -305,19 +378,15 @@ function Addon:AddBuff(text)
         end)
     end
     if not id then return false, "Choose a learned buff spell." end
-    local helpful = IsHelpfulSpell or (C_Spell and C_Spell.IsSpellHelpful)
-    if helpful then
-        local ok, result = pcall(helpful, id)
-        if ok and result == false then return false, "Choose a helpful buff spell." end
-    end
     local name = SpellInfo(id)
     if not name then return false, "Spell data is unavailable." end
     local key = BuffName(name)
-    for index = 1, #config.monitored do
-        local existing = self:GetEntry(index)
-        if existing and BuffName(existing) == key then return false, "That buff is already monitored." end
+    local kind = ShamanKind(id, key)
+    if not IsHelpfulBuff(id, kind) then return false, "Choose a helpful buff spell." end
+    if IsMonitored(key, kind) then
+        return false, kind and "That buff group is already monitored." or "That buff is already monitored."
     end
-    config.monitored[#config.monitored + 1] = {id = id}
+    config.monitored[#config.monitored + 1] = kind and {kind = kind} or {id = id}
     BuildGroups()
     Refresh()
     return true
